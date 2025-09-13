@@ -215,7 +215,7 @@ export function SettingsPopup({
         await generateText({
           model,
           messages: [{ role: 'user', content: 'Hello' }],
-          maxTokens: 1,
+          max_tokens: 1,
         });
 
         setApiKeyStatuses((prev) => ({ ...prev, [providerId]: 'valid' }));

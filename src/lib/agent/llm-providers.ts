@@ -43,7 +43,7 @@ export class LLMProvider {
           content: msg.content,
         })),
         temperature: options.temperature ?? modelConfig.temperature.default,
-        maxTokens: options.maxTokens ?? modelConfig.maxTokens,
+        max_tokens: options.maxTokens ?? modelConfig.maxTokens,
       });
 
       return {
@@ -116,7 +116,7 @@ export class LLMProvider {
           content: msg.content,
         })),
         temperature: options.temperature ?? modelConfig.temperature.default,
-        maxTokens: options.maxTokens ?? modelConfig.maxTokens,
+        max_tokens: options.maxTokens ?? modelConfig.maxTokens,
       });
 
       // Handle the streaming response according to AI SDK v5 docs

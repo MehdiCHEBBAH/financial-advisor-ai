@@ -222,7 +222,7 @@ export class APIKeyService {
       await generateText({
         model,
         messages: [{ role: 'user', content: 'test' }],
-        maxTokens: 1,
+        max_tokens: 1,
       });
 
       return { configured: true };
