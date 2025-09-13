@@ -6,6 +6,7 @@ import { allTools } from '@/lib/tools';
 import { ChatOpenAI } from '@langchain/openai';
 import { ChatGroq } from '@langchain/groq';
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
+import { ChatDeepSeek } from '@langchain/deepseek';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 
 // LLM Provider implementations using LangChain
@@ -79,19 +80,18 @@ export class LLMProvider {
           return new HumanMessage(msg.content); // assistant messages as human for simplicity
         }
       });
-      
-      // Create a mutable copy for tool results
-      const messagesWithTools = [...langchainMessages];
 
       // Get the appropriate LangChain model with tools
       const model = this.getLangChainModelWithTools(modelConfig.provider, config.model, config.apiKey);
 
-      // First, get the initial response to check for tool calls
+      // Step 1: Get initial response with thinking and tool calls
       const initialResult = await model.invoke(langchainMessages);
       
-      // Check if the result contains tool calls
+      // Step 2: Execute tools if any were called
+      const toolResults: Array<{name: string, args: Record<string, unknown>, result: unknown, success: boolean}> = [];
+      
       if (initialResult.tool_calls && initialResult.tool_calls.length > 0) {
-        // Execute tool calls
+        // Execute all tool calls
         for (const toolCall of initialResult.tool_calls) {
           try {
             // Find the tool by name
@@ -100,29 +100,67 @@ export class LLMProvider {
               // Execute the tool
               const toolResult = await tool.invoke(toolCall.args);
               
-              // Add tool result to messages
-              messagesWithTools.push(new HumanMessage(`Tool ${toolCall.name} result: ${JSON.stringify(toolResult)}`));
-              
-              // Yield tool call information with result
-              yield `<tool name="${toolCall.name}" args='${JSON.stringify(toolCall.args)}' result='${JSON.stringify(toolResult)}' success="true"></tool>`;
+              toolResults.push({
+                name: toolCall.name,
+                args: toolCall.args,
+                result: toolResult,
+                success: true
+              });
             }
           } catch (toolError) {
             console.error(`Tool ${toolCall.name} execution error:`, toolError);
-            // Add error to messages
-            messagesWithTools.push(new HumanMessage(`Tool ${toolCall.name} error: ${toolError instanceof Error ? toolError.message : 'Unknown error'}`));
             
-            // Yield tool call information with error
-            yield `<tool name="${toolCall.name}" args='${JSON.stringify(toolCall.args)}' error='${toolError instanceof Error ? toolError.message : 'Unknown error'}' success="false"></tool>`;
+            toolResults.push({
+              name: toolCall.name,
+              args: toolCall.args,
+              result: toolError instanceof Error ? toolError.message : 'Unknown error',
+              success: false
+            });
           }
         }
         
-        // Get final response after tool execution
-        const finalResult = await model.invoke(messagesWithTools);
+        // Step 3: Add tool results to conversation and get final response
+        const messagesWithToolResults = [
+          ...langchainMessages,
+          new HumanMessage(`Tool execution results: ${JSON.stringify(toolResults)}`)
+        ];
+        
+        const finalResult = await model.invoke(messagesWithToolResults);
+        
+        // Step 4: Build complete response with all sections
         if (finalResult.content) {
-          yield finalResult.content as string;
+          // Parse the final response to extract thinking, tools, and main content
+          const { thinking, mainContent } = this.parseResponse(finalResult.content as string);
+          
+          // Build complete response
+          let completeResponse = '';
+          
+          // Add thinking section if present
+          if (thinking) {
+            completeResponse += `<think>\n${thinking}\n</think>\n\n`;
+          }
+          
+          // Add tools section if tools were used
+          if (toolResults.length > 0) {
+            completeResponse += `<tools>\n`;
+            for (const toolResult of toolResults) {
+              if (toolResult.success) {
+                completeResponse += `<tool name="${toolResult.name}" args='${JSON.stringify(toolResult.args)}' result='${JSON.stringify(toolResult.result)}' success="true"></tool>\n`;
+              } else {
+                completeResponse += `<tool name="${toolResult.name}" args='${JSON.stringify(toolResult.args)}' error='${toolResult.result}' success="false"></tool>\n`;
+              }
+            }
+            completeResponse += `</tools>\n\n`;
+          }
+          
+          // Add main response
+          completeResponse += mainContent;
+          
+          // Stream the complete response
+          yield completeResponse;
         }
       } else {
-        // No tool calls, just yield the content
+        // No tools, just stream the initial response
         if (initialResult.content) {
           yield initialResult.content as string;
         }
@@ -147,6 +185,11 @@ export class LLMProvider {
         });
       case 'google':
         return new ChatGoogleGenerativeAI({
+          model: model,
+          apiKey: apiKey,
+        });
+      case 'deepseek':
+        return new ChatDeepSeek({
           model: model,
           apiKey: apiKey,
         });
@@ -177,5 +220,25 @@ export class LLMProvider {
     if (envVar) {
       process.env[envVar] = apiKey;
     }
+  }
+
+  private static parseResponse(content: string): { thinking: string; mainContent: string } {
+    let thinking = '';
+    let mainContent = content;
+
+    // Extract thinking blocks (case insensitive)
+    const thinkingRegex = /<think>([\s\S]*?)<\/think>/gi;
+    const thinkingMatches = content.match(thinkingRegex);
+    
+    if (thinkingMatches) {
+      thinking = thinkingMatches
+        .map(match => match.replace(/<\/?think>/gi, ''))
+        .join('\n\n');
+      
+      // Remove thinking blocks from main content
+      mainContent = content.replace(thinkingRegex, '').trim();
+    }
+
+    return { thinking, mainContent };
   }
 }

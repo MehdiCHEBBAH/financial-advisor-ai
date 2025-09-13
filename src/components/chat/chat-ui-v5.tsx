@@ -80,48 +80,55 @@ function parseMessageContent(content: string): {
     }
   }
 
-  // Extract tool calls with results using <tool></tool> format
-  const toolCallRegex = /<tool\s+name="([^"]+)"\s+args='([^']*)'\s+(?:result='([^']*)'\s+success="true"|error='([^']*)'\s+success="false")[^>]*><\/tool>/g;
-  let toolMatch;
+  // Extract tools section first
+  const toolsSectionRegex = /<tools>([\s\S]*?)<\/tools>/gi;
+  const toolsSectionMatch = content.match(toolsSectionRegex);
   
-  while ((toolMatch = toolCallRegex.exec(content)) !== null) {
-    const toolName = toolMatch[1];
-    const argsString = toolMatch[2];
-    const resultString = toolMatch[3];
-    const errorString = toolMatch[4];
+  if (toolsSectionMatch) {
+    const toolsSection = toolsSectionMatch[0];
     
-    try {
-      const args = argsString ? JSON.parse(argsString) : {};
-      let result = null;
+    // Extract individual tool calls from tools section
+    const toolCallRegex = /<tool\s+name="([^"]+)"\s+args='([^']*)'\s+(?:result='([^']*)'\s+success="true"|error='([^']*)'\s+success="false")[^>]*><\/tool>/g;
+    let toolMatch;
+    
+    while ((toolMatch = toolCallRegex.exec(toolsSection)) !== null) {
+      const toolName = toolMatch[1];
+      const argsString = toolMatch[2];
+      const resultString = toolMatch[3];
+      const errorString = toolMatch[4];
       
-      if (resultString) {
-        try {
-          result = JSON.parse(resultString);
-        } catch {
-          result = resultString;
+      try {
+        const args = argsString ? JSON.parse(argsString) : {};
+        let result = null;
+        
+        if (resultString) {
+          try {
+            result = JSON.parse(resultString);
+          } catch {
+            result = resultString;
+          }
         }
+        
+        toolCalls.push({
+          name: toolName,
+          args,
+          result: result,
+          success: !errorString,
+        });
+      } catch {
+        // If JSON parsing fails, store as string
+        toolCalls.push({
+          name: toolName,
+          args: { raw: argsString },
+          result: resultString || errorString,
+          success: !errorString,
+        });
       }
-      
-      toolCalls.push({
-        name: toolName,
-        args,
-        result: result,
-        success: !errorString,
-      });
-    } catch {
-      // If JSON parsing fails, store as string
-      toolCalls.push({
-        name: toolName,
-        args: { raw: argsString },
-        result: resultString || errorString,
-        success: !errorString,
-      });
     }
+    
+    // Remove tools section from main content
+    mainContent = mainContent.replace(toolsSectionRegex, '').trim();
   }
-  
-  // Remove tool calls from main content using a fresh regex
-  const toolCallRemoveRegex = /<tool\s+name="([^"]+)"\s+args='([^']*)'\s+(?:result='([^']*)'\s+success="true"|error='([^']*)'\s+success="false")[^>]*><\/tool>/g;
-  mainContent = mainContent.replace(toolCallRemoveRegex, '').trim();
 
   // Debug logging
   console.log('Parsing content:', content.substring(0, 200) + '...');
