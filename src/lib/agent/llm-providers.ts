@@ -87,6 +87,12 @@ export class LLMProvider {
       // Step 1: Get initial response with thinking and tool calls
       const initialResult = await model.invoke(langchainMessages);
       
+      // Yield the initial thinking content immediately
+      if (initialResult.content) {
+        console.log('🔧 [LLM DEBUG] Yielding initial content:', (initialResult.content as string).substring(0, 200) + '...');
+        yield initialResult.content as string;
+      }
+      
       // Step 2: Execute tools if any were called
       const toolResults: Array<{name: string, args: Record<string, unknown>, result: unknown, success: boolean}> = [];
       
@@ -127,37 +133,28 @@ export class LLMProvider {
         
         const finalResult = await model.invoke(messagesWithToolResults);
         
-        // Step 4: Build complete response with all sections
-        if (finalResult.content) {
-          // Parse the final response to extract thinking, tools, and main content
-          const { thinking, mainContent } = this.parseResponse(finalResult.content as string);
-          
-          // Build complete response
-          let completeResponse = '';
-          
-          // Add thinking section if present
-          if (thinking) {
-            completeResponse += `<think>\n${thinking}\n</think>\n\n`;
-          }
-          
-          // Add tools section if tools were used
-          if (toolResults.length > 0) {
-            completeResponse += `<tools>\n`;
-            for (const toolResult of toolResults) {
-              if (toolResult.success) {
-                completeResponse += `<tool name="${toolResult.name}" args='${JSON.stringify(toolResult.args)}' result='${JSON.stringify(toolResult.result)}' success="true"></tool>\n`;
-              } else {
-                completeResponse += `<tool name="${toolResult.name}" args='${JSON.stringify(toolResult.args)}' error='${toolResult.result}' success="false"></tool>\n`;
-              }
+        // Step 4: Add tools section and final response
+        if (toolResults.length > 0) {
+          // Add tools section
+          let toolsSection = `<tools>\n`;
+          for (const toolResult of toolResults) {
+            if (toolResult.success) {
+              toolsSection += `<tool name="${toolResult.name}" args='${JSON.stringify(toolResult.args)}' result='${JSON.stringify(toolResult.result)}' success="true"></tool>\n`;
+            } else {
+              toolsSection += `<tool name="${toolResult.name}" args='${JSON.stringify(toolResult.args)}' error='${toolResult.result}' success="false"></tool>\n`;
             }
-            completeResponse += `</tools>\n\n`;
           }
+          toolsSection += `</tools>\n\n`;
           
-          // Add main response
-          completeResponse += mainContent;
-          
-          // Stream the complete response
-          yield completeResponse;
+          // Yield tools section
+          console.log('🔧 [LLM DEBUG] Yielding tools section:', toolsSection.substring(0, 200) + '...');
+          yield toolsSection;
+        }
+        
+        // Step 5: Yield final response
+        if (finalResult.content) {
+          console.log('🔧 [LLM DEBUG] Yielding final content:', (finalResult.content as string).substring(0, 200) + '...');
+          yield finalResult.content as string;
         }
       } else {
         // No tools, just stream the initial response

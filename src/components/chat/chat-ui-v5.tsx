@@ -84,14 +84,18 @@ function parseMessageContent(content: string): {
   const toolsSectionRegex = /<tools>([\s\S]*?)<\/tools>/gi;
   const toolsSectionMatch = content.match(toolsSectionRegex);
   
+  console.log('🔧 [PARSING DEBUG] Tools section match:', toolsSectionMatch);
+  
   if (toolsSectionMatch) {
     const toolsSection = toolsSectionMatch[0];
+    console.log('🔧 [PARSING DEBUG] Tools section content:', toolsSection);
     
-    // Extract individual tool calls from tools section
+    // Extract individual tool calls from tools section - more flexible regex
     const toolCallRegex = /<tool\s+name="([^"]+)"\s+args='([^']*)'\s+(?:result='([^']*)'\s+success="true"|error='([^']*)'\s+success="false")[^>]*><\/tool>/g;
     let toolMatch;
     
     while ((toolMatch = toolCallRegex.exec(toolsSection)) !== null) {
+      console.log('🔧 [PARSING DEBUG] Tool match:', toolMatch);
       const toolName = toolMatch[1];
       const argsString = toolMatch[2];
       const resultString = toolMatch[3];
@@ -115,6 +119,8 @@ function parseMessageContent(content: string): {
           result: result,
           success: !errorString,
         });
+        
+        console.log('🔧 [PARSING DEBUG] Added tool call:', { name: toolName, success: !errorString });
       } catch {
         // If JSON parsing fails, store as string
         toolCalls.push({
@@ -123,25 +129,37 @@ function parseMessageContent(content: string): {
           result: resultString || errorString,
           success: !errorString,
         });
+        
+        console.log('🔧 [PARSING DEBUG] Added tool call (fallback):', { name: toolName, success: !errorString });
       }
     }
     
     // Remove tools section from main content
     mainContent = mainContent.replace(toolsSectionRegex, '').trim();
+    console.log('🔧 [PARSING DEBUG] Main content after removing tools:', mainContent.substring(0, 100) + '...');
   }
 
   // Debug logging
-  console.log('Parsing content:', content.substring(0, 200) + '...');
+  console.log('=== PARSING DEBUG ===');
+  console.log('Full content length:', content.length);
+  console.log('Content preview:', content.substring(0, 500) + '...');
+  console.log('Has thinking tags:', /<think>/i.test(content));
+  console.log('Has tools tags:', /<tools>/i.test(content));
+  console.log('Has tool tags:', /<tool/i.test(content));
   
   if (thinking) {
-    console.log('Parsed thinking:', thinking);
+    console.log('Parsed thinking length:', thinking.length);
+    console.log('Parsed thinking preview:', thinking.substring(0, 200) + '...');
   }
   
   if (toolCalls.length > 0) {
+    console.log('Parsed tool calls count:', toolCalls.length);
     console.log('Parsed tool calls:', toolCalls);
   }
   
-  console.log('Main content after filtering:', mainContent.substring(0, 100) + '...');
+  console.log('Main content length after filtering:', mainContent.length);
+  console.log('Main content after filtering:', mainContent.substring(0, 200) + '...');
+  console.log('=== END PARSING DEBUG ===');
   
   return { thinking, mainContent, toolCalls };
 }
