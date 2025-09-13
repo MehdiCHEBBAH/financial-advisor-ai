@@ -186,30 +186,45 @@ export class APIKeyService {
       // Set the API key as environment variable for the test
       this.setAPIKeyEnvironmentVariable(provider, apiKey);
 
-      // Import the AI SDK
-      const { generateText } = await import('ai');
+      // Import LangChain
+      const { HumanMessage } = await import('@langchain/core/messages');
 
       // Create the model for testing
       let model;
       switch (provider) {
         case 'groq': {
-          const { groq } = await import('@ai-sdk/groq');
-          model = groq(modelConfig.model);
+          const { ChatGroq } = await import('@langchain/groq');
+          model = new ChatGroq({
+            model: modelConfig.model,
+            apiKey: apiKey,
+          });
           break;
         }
         case 'openai': {
-          const { openai } = await import('@ai-sdk/openai');
-          model = openai(modelConfig.model);
+          const { ChatOpenAI } = await import('@langchain/openai');
+          model = new ChatOpenAI({
+            model: modelConfig.model,
+            openAIApiKey: apiKey,
+          });
           break;
         }
         case 'google': {
-          const { google } = await import('@ai-sdk/google');
-          model = google(modelConfig.model);
+          const { ChatGoogleGenerativeAI } = await import('@langchain/google-genai');
+          model = new ChatGoogleGenerativeAI({
+            model: modelConfig.model,
+            apiKey: apiKey,
+          });
           break;
         }
         case 'deepseek': {
-          const { deepseek } = await import('@ai-sdk/deepseek');
-          model = deepseek(modelConfig.model);
+          const { ChatOpenAI } = await import('@langchain/openai');
+          model = new ChatOpenAI({
+            model: modelConfig.model,
+            openAIApiKey: apiKey,
+            configuration: {
+              baseURL: 'https://api.deepseek.com/v1',
+            },
+          });
           break;
         }
         default:
@@ -220,10 +235,7 @@ export class APIKeyService {
       }
 
       // Make a simple test call
-      await generateText({
-        model,
-        messages: [{ role: 'user', content: 'test' }],
-      });
+      await model.invoke([new HumanMessage('test')]);
 
       return { configured: true };
     } catch (error: unknown) {

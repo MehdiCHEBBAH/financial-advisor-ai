@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { MODEL_CONFIGS } from '@/lib/agent';
 
 export async function GET() {
@@ -11,7 +11,7 @@ export async function GET() {
         model: config.model,
         description: config.description,
         capabilities: config.capabilities,
-        maxTokens: config.maxTokens,
+        maxOutputTokens: config.maxOutputTokens,
         temperature: config.temperature,
       })),
     });

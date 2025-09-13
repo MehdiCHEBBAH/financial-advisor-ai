@@ -1,5 +1,6 @@
-// Agent and model types
+// Agent and model types - using AI SDK 5 types
 export interface AgentMessage {
+  id: string;
   role: 'system' | 'user' | 'assistant';
   content: string;
 }
@@ -8,17 +9,12 @@ export interface AgentRequest {
   messages: AgentMessage[];
   model: string;
   temperature?: number;
-  maxTokens?: number;
+  maxOutputTokens?: number;
 }
 
 export interface AgentResponse {
   content: string;
   model: string;
-  usage?: {
-    promptTokens: number;
-    completionTokens: number;
-    totalTokens: number;
-  };
 }
 
 export interface ModelConfig {
@@ -27,7 +23,7 @@ export interface ModelConfig {
   provider: 'groq' | 'openai' | 'deepseek' | 'google';
   model: string;
   description: string;
-  maxTokens: number;
+  maxOutputTokens: number;
   temperature: {
     min: number;
     max: number;

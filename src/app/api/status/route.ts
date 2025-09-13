@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 
 export interface StatusResponse {
   service: string;
@@ -12,7 +12,7 @@ export interface StatusResponse {
   };
 }
 
-export async function GET(request: NextRequest): Promise<NextResponse<StatusResponse>> {
+export async function GET(): Promise<NextResponse<StatusResponse>> {
   try {
     // Simulate dependency checks
     const dependencies = {

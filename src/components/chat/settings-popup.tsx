@@ -167,8 +167,8 @@ export function SettingsPopup({
       // Save the key temporarily for testing
       APIKeyService.setAPIKey(providerId, apiKey);
 
-      // Test with a simple completion using Vercel AI SDK
-      const { generateText } = await import('ai');
+      // Test with a simple completion using LangChain
+        const { HumanMessage } = await import('@langchain/core/messages');
       const testModel = getModelsByProvider(providerId)[0];
 
       if (testModel) {
@@ -176,23 +176,39 @@ export function SettingsPopup({
         let model;
         switch (providerId) {
           case 'groq': {
-            const { groq } = await import('@ai-sdk/groq');
-            model = groq(testModel.model);
+            const { ChatGroq } = await import('@langchain/groq');
+            model = new ChatGroq({
+              model: testModel.model,
+              apiKey: apiKey,
+            });
             break;
           }
           case 'openai': {
-            const { openai } = await import('@ai-sdk/openai');
-            model = openai(testModel.model);
+            const { ChatOpenAI } = await import('@langchain/openai');
+            model = new ChatOpenAI({
+              model: testModel.model,
+              openAIApiKey: apiKey,
+            });
             break;
           }
           case 'google': {
-            const { google } = await import('@ai-sdk/google');
-            model = google(testModel.model);
+            const { ChatGoogleGenerativeAI } = await import('@langchain/google-genai');
+            model = new ChatGoogleGenerativeAI({
+              model: testModel.model,
+              apiKey: apiKey,
+            });
             break;
           }
           case 'deepseek': {
-            const { deepseek } = await import('@ai-sdk/deepseek');
-            model = deepseek(testModel.model);
+            // DeepSeek is not supported in LangChain, use OpenAI format
+            const { ChatOpenAI } = await import('@langchain/openai');
+            model = new ChatOpenAI({
+              model: testModel.model,
+              openAIApiKey: apiKey,
+              configuration: {
+                baseURL: 'https://api.deepseek.com/v1',
+              },
+            });
             break;
           }
           default:
@@ -212,10 +228,7 @@ export function SettingsPopup({
           (process.env as Record<string, string>)[envVar] = apiKey;
         }
 
-        await generateText({
-          model,
-          messages: [{ role: 'user', content: 'Hello' }],
-        });
+        await model.invoke([new HumanMessage('Hello')]);
 
         setApiKeyStatuses((prev) => ({ ...prev, [providerId]: 'valid' }));
       }
@@ -371,7 +384,7 @@ export function SettingsPopup({
                       </div>
                       <div className="flex gap-2 mt-2">
                         <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
-                          {model.maxTokens.toLocaleString()} tokens
+                          {model.maxOutputTokens.toLocaleString()} tokens
                         </span>
                         {model.capabilities.functionCalling && (
                           <span className="text-xs bg-green-100 text-green-600 px-2 py-1 rounded">

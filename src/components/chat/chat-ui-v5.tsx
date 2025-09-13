@@ -21,7 +21,7 @@ interface Message {
   errorProvider?: string;
 }
 
-export function ChatUI() {
+export function ChatUIV5() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedModel, setSelectedModel] = useState<string>(getDefaultModel());
@@ -77,7 +77,7 @@ export function ChatUI() {
         model: selectedModel,
         messages: agentMessages,
         temperature: 0.7,
-        maxTokens: 1000,
+        maxOutputTokens: 1000,
       };
 
       // Get user API keys to send with request

@@ -12,7 +12,7 @@ export const MODEL_CONFIGS: ModelConfig[] = [
     provider: 'groq',
     model: 'llama-3.1-8b-instant',
     description: 'Meta Llama 3.1 8B model - fast and efficient with tool calling support',
-    maxTokens: 8192,
+    maxOutputTokens: 8192,
     temperature: {
       min: 0,
       max: 2,
@@ -30,7 +30,7 @@ export const MODEL_CONFIGS: ModelConfig[] = [
     provider: 'groq',
     model: 'llama-3.3-70b-versatile',
     description: 'Meta Llama 3.3 70B model - versatile and capable with tool calling support',
-    maxTokens: 8192,
+    maxOutputTokens: 8192,
     temperature: {
       min: 0,
       max: 2,
@@ -48,7 +48,7 @@ export const MODEL_CONFIGS: ModelConfig[] = [
     provider: 'groq',
     model: 'openai/gpt-oss-120b',
     description: 'OpenAI GPT-OSS 120B model with tool calling support',
-    maxTokens: 8192,
+    maxOutputTokens: 8192,
     temperature: {
       min: 0,
       max: 2,
@@ -66,7 +66,7 @@ export const MODEL_CONFIGS: ModelConfig[] = [
     provider: 'groq',
     model: 'openai/gpt-oss-20b',
     description: 'OpenAI GPT-OSS 20B model with tool calling support',
-    maxTokens: 8192,
+    maxOutputTokens: 8192,
     temperature: {
       min: 0,
       max: 2,
@@ -86,7 +86,7 @@ export const MODEL_CONFIGS: ModelConfig[] = [
     provider: 'openai',
     model: 'gpt-4o',
     description: "OpenAI's most advanced multimodal model",
-    maxTokens: 4096,
+    maxOutputTokens: 4096,
     temperature: {
       min: 0,
       max: 2,
@@ -104,7 +104,7 @@ export const MODEL_CONFIGS: ModelConfig[] = [
     provider: 'openai',
     model: 'gpt-4o-mini',
     description: 'Faster, more affordable GPT-4o variant',
-    maxTokens: 16384,
+    maxOutputTokens: 16384,
     temperature: {
       min: 0,
       max: 2,
@@ -122,7 +122,7 @@ export const MODEL_CONFIGS: ModelConfig[] = [
     provider: 'openai',
     model: 'gpt-4-turbo-preview',
     description: 'High-performance GPT-4 with extended context',
-    maxTokens: 4096,
+    maxOutputTokens: 4096,
     temperature: {
       min: 0,
       max: 2,
@@ -142,7 +142,7 @@ export const MODEL_CONFIGS: ModelConfig[] = [
     provider: 'deepseek',
     model: 'deepseek-chat',
     description: "DeepSeek's advanced conversational AI model",
-    maxTokens: 4096,
+    maxOutputTokens: 4096,
     temperature: {
       min: 0,
       max: 2,
@@ -160,7 +160,7 @@ export const MODEL_CONFIGS: ModelConfig[] = [
     provider: 'deepseek',
     model: 'deepseek-coder',
     description: 'Specialized for coding tasks and technical analysis',
-    maxTokens: 4096,
+    maxOutputTokens: 4096,
     temperature: {
       min: 0,
       max: 2,
@@ -180,7 +180,7 @@ export const MODEL_CONFIGS: ModelConfig[] = [
     provider: 'google',
     model: 'gemini-1.5-pro',
     description: "Google's most capable multimodal model",
-    maxTokens: 8192,
+    maxOutputTokens: 8192,
     temperature: {
       min: 0,
       max: 2,
@@ -198,7 +198,7 @@ export const MODEL_CONFIGS: ModelConfig[] = [
     provider: 'google',
     model: 'gemini-1.5-flash',
     description: 'Fast and efficient Gemini model',
-    maxTokens: 8192,
+    maxOutputTokens: 8192,
     temperature: {
       min: 0,
       max: 2,

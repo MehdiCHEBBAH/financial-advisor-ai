@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 
 export interface HealthCheckResponse {
   status: 'healthy' | 'unhealthy';
@@ -8,7 +8,7 @@ export interface HealthCheckResponse {
   environment: string;
 }
 
-export async function GET(request: NextRequest): Promise<NextResponse<HealthCheckResponse>> {
+export async function GET(): Promise<NextResponse<HealthCheckResponse>> {
   try {
     const healthData: HealthCheckResponse = {
       status: 'healthy',

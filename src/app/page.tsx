@@ -1,5 +1,5 @@
-import { ChatUI } from '@/components/chat/chat-ui';
+import { ChatUIV5 } from '@/components/chat/chat-ui-v5';
 
 export default function Home() {
-  return <ChatUI />;
+  return <ChatUIV5 />;
 }

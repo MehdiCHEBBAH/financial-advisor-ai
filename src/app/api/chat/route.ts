@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { FinancialAgent, validateModel } from '@/lib/agent';
 import { AgentMessage } from '@/lib/agent/types';
 
-// OpenAI Chat Completions API format
+// OpenAI Chat Completions API format for backward compatibility
 interface OpenAIMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
@@ -15,21 +15,6 @@ interface OpenAIRequest {
   temperature?: number;
   max_tokens?: number;
   userApiKeys?: Record<string, string>;
-}
-
-interface OpenAIStreamChunk {
-  id: string;
-  object: 'chat.completion.chunk';
-  created: number;
-  model: string;
-  choices: Array<{
-    index: number;
-    delta: {
-      role?: string;
-      content?: string;
-    };
-    finish_reason?: string | null;
-  }>;
 }
 
 export async function POST(request: NextRequest) {
@@ -101,17 +86,13 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Initialize agent
-    const agent = new FinancialAgent();
-
-    // Convert OpenAI format to agent format
-    const agentMessages = FinancialAgent.convertFromOpenAIFormat(body.messages);
+    // Convert OpenAI format to UIMessage format
+    const uiMessages: AgentMessage[] = FinancialAgent.convertFromOpenAIFormat(body.messages);
 
     // If streaming is requested (default for OpenAI)
     if (body.stream !== false) {
       return createAgentStreamingResponse(
-        agent,
-        agentMessages,
+        uiMessages,
         body.model,
         body.temperature,
         body.max_tokens
@@ -119,8 +100,7 @@ export async function POST(request: NextRequest) {
     } else {
       // Non-streaming response
       return createAgentNonStreamingResponse(
-        agent,
-        agentMessages,
+        uiMessages,
         body.model,
         body.temperature,
         body.max_tokens
@@ -188,10 +168,9 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Agent-based response functions
+// AI SDK 5 streaming response using standard streaming
 async function createAgentStreamingResponse(
-  agent: FinancialAgent,
-  messages: AgentMessage[],
+  uiMessages: AgentMessage[],
   model: string,
   temperature?: number,
   maxTokens?: number
@@ -203,7 +182,7 @@ async function createAgentStreamingResponse(
 
       try {
         // Send initial role chunk
-        const roleChunk: OpenAIStreamChunk = {
+        const roleChunk = {
           id: chunkId,
           object: 'chat.completion.chunk',
           created: Math.floor(Date.now() / 1000),
@@ -220,14 +199,17 @@ async function createAgentStreamingResponse(
           encoder.encode(`data: ${JSON.stringify(roleChunk)}\n\n`)
         );
 
+        // Initialize agent
+        const agent = new FinancialAgent();
+        
         // Stream response from agent
         for await (const chunk of agent.processMessageStream({
-          messages,
+          messages: uiMessages,
           model,
           temperature,
-          maxTokens,
+          maxOutputTokens: maxTokens,
         })) {
-          const contentChunk: OpenAIStreamChunk = {
+          const contentChunk = {
             id: chunkId,
             object: 'chat.completion.chunk',
             created: Math.floor(Date.now() / 1000),
@@ -246,7 +228,7 @@ async function createAgentStreamingResponse(
         }
 
         // Send completion chunk
-        const completionChunk: OpenAIStreamChunk = {
+        const completionChunk = {
           id: chunkId,
           object: 'chat.completion.chunk',
           created: Math.floor(Date.now() / 1000),
@@ -268,40 +250,21 @@ async function createAgentStreamingResponse(
         controller.close();
       } catch (error) {
         console.error('Streaming error:', error);
-
+        
         // Send error as a special error chunk
-        const errorMessage =
-          error instanceof Error ? error.message : 'Streaming error occurred';
+        const errorMessage = error instanceof Error ? error.message : 'Streaming error occurred';
         let errorType = 'unknown';
 
         // Categorize streaming errors
-        if (
-          errorMessage.includes('API key not configured') ||
-          errorMessage.includes('API key')
-        ) {
+        if (errorMessage.includes('API key not configured') || errorMessage.includes('API key')) {
           errorType = 'missing_key';
-        } else if (
-          errorMessage.includes('quota') ||
-          errorMessage.includes('billing') ||
-          errorMessage.includes('rate limit')
-        ) {
+        } else if (errorMessage.includes('quota') || errorMessage.includes('billing') || errorMessage.includes('rate limit')) {
           errorType = 'quota_exceeded';
-        } else if (
-          errorMessage.includes('not supported') ||
-          errorMessage.includes('not available') ||
-          errorMessage.includes('model')
-        ) {
+        } else if (errorMessage.includes('not supported') || errorMessage.includes('not available') || errorMessage.includes('model')) {
           errorType = 'model_not_supported';
-        } else if (
-          errorMessage.includes('network') ||
-          errorMessage.includes('connection') ||
-          errorMessage.includes('timeout')
-        ) {
+        } else if (errorMessage.includes('network') || errorMessage.includes('connection') || errorMessage.includes('timeout')) {
           errorType = 'network_error';
-        } else if (
-          errorMessage.includes('authentication') ||
-          errorMessage.includes('unauthorized')
-        ) {
+        } else if (errorMessage.includes('authentication') || errorMessage.includes('unauthorized')) {
           errorType = 'authentication_error';
         }
 
@@ -341,21 +304,25 @@ async function createAgentStreamingResponse(
   });
 }
 
+// Non-streaming response using AI SDK 5 patterns
 async function createAgentNonStreamingResponse(
-  agent: FinancialAgent,
-  messages: AgentMessage[],
+  uiMessages: AgentMessage[],
   model: string,
   temperature?: number,
   maxTokens?: number
 ) {
   try {
+    // Initialize agent
+    const agent = new FinancialAgent();
+    
     const response = await agent.processMessage({
-      messages,
+      messages: uiMessages,
       model,
       temperature,
-      maxTokens,
+      maxOutputTokens: maxTokens,
     });
 
+    // Convert back to OpenAI format for backward compatibility
     const openAIResponse = {
       id: `chatcmpl-${Date.now()}`,
       object: 'chat.completion',
@@ -371,7 +338,7 @@ async function createAgentNonStreamingResponse(
           finish_reason: 'stop',
         },
       ],
-      usage: response.usage || {
+      usage: {
         prompt_tokens: 0,
         completion_tokens: 0,
         total_tokens: 0,
@@ -395,37 +362,19 @@ async function createAgentNonStreamingResponse(
       errorMessage = error.message;
 
       // Categorize errors based on message content
-      if (
-        errorMessage.includes('API key not configured') ||
-        errorMessage.includes('API key')
-      ) {
+      if (errorMessage.includes('API key not configured') || errorMessage.includes('API key')) {
         errorType = 'missing_key';
         statusCode = 401;
-      } else if (
-        errorMessage.includes('quota') ||
-        errorMessage.includes('billing') ||
-        errorMessage.includes('rate limit')
-      ) {
+      } else if (errorMessage.includes('quota') || errorMessage.includes('billing') || errorMessage.includes('rate limit')) {
         errorType = 'quota_exceeded';
         statusCode = 429;
-      } else if (
-        errorMessage.includes('not supported') ||
-        errorMessage.includes('not available') ||
-        errorMessage.includes('model')
-      ) {
+      } else if (errorMessage.includes('not supported') || errorMessage.includes('not available') || errorMessage.includes('model')) {
         errorType = 'model_not_supported';
         statusCode = 400;
-      } else if (
-        errorMessage.includes('network') ||
-        errorMessage.includes('connection') ||
-        errorMessage.includes('timeout')
-      ) {
+      } else if (errorMessage.includes('network') || errorMessage.includes('connection') || errorMessage.includes('timeout')) {
         errorType = 'network_error';
         statusCode = 503;
-      } else if (
-        errorMessage.includes('authentication') ||
-        errorMessage.includes('unauthorized')
-      ) {
+      } else if (errorMessage.includes('authentication') || errorMessage.includes('unauthorized')) {
         errorType = 'authentication_error';
         statusCode = 401;
       }
