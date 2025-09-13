@@ -1,5 +1,8 @@
 import { ModelConfig, Provider } from './types';
 
+// Re-export Provider for convenience
+export type { Provider };
+
 // Model configurations for all supported LLMs (only tool-calling enabled models)
 export const MODEL_CONFIGS: ModelConfig[] = [
   // Groq Models (only tool-calling enabled)

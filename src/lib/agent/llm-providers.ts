@@ -43,15 +43,15 @@ export class LLMProvider {
           content: msg.content,
         })),
         temperature: options.temperature ?? modelConfig.temperature.default,
-        max_tokens: options.maxTokens ?? modelConfig.maxTokens,
+        ...(options.maxTokens ?? modelConfig.maxTokens ? { maxTokens: options.maxTokens ?? modelConfig.maxTokens } : {}),
       });
 
       return {
         content: result.text,
         model: modelConfig.id,
         usage: {
-          promptTokens: result.usage?.promptTokens ?? 0,
-          completionTokens: result.usage?.completionTokens ?? 0,
+          promptTokens: (result.usage as { promptTokens?: number })?.promptTokens ?? 0,
+          completionTokens: (result.usage as { completionTokens?: number })?.completionTokens ?? 0,
           totalTokens: result.usage?.totalTokens ?? 0,
         },
       };
@@ -116,7 +116,7 @@ export class LLMProvider {
           content: msg.content,
         })),
         temperature: options.temperature ?? modelConfig.temperature.default,
-        max_tokens: options.maxTokens ?? modelConfig.maxTokens,
+        ...(options.maxTokens ?? modelConfig.maxTokens ? { maxTokens: options.maxTokens ?? modelConfig.maxTokens } : {}),
       });
 
       // Handle the streaming response according to AI SDK v5 docs

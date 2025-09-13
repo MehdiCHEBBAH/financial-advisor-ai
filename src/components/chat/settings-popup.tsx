@@ -215,7 +215,6 @@ export function SettingsPopup({
         await generateText({
           model,
           messages: [{ role: 'user', content: 'Hello' }],
-          max_tokens: 1,
         });
 
         setApiKeyStatuses((prev) => ({ ...prev, [providerId]: 'valid' }));
@@ -577,9 +576,9 @@ export function SettingsPopup({
           <Button
             onClick={onClose}
             disabled={
-              selectedProvider &&
+              !!(selectedProvider &&
               providerConfig?.requiresApiKey &&
-              apiKeyStatuses[selectedProvider] === 'invalid'
+              apiKeyStatuses[selectedProvider] === 'invalid')
             }
           >
             Save Settings

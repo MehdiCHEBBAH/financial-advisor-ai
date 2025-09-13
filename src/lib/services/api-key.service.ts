@@ -3,6 +3,7 @@ import {
   ModelStatus,
   APIKeyError,
   ModelConfigurationStatus,
+  ModelConfig,
 } from '@/lib/agent/types';
 import { MODEL_CONFIGS } from '@/lib/agent/models';
 
@@ -222,7 +223,6 @@ export class APIKeyService {
       await generateText({
         model,
         messages: [{ role: 'user', content: 'test' }],
-        max_tokens: 1,
       });
 
       return { configured: true };
