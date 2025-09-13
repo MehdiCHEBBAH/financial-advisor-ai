@@ -1,68 +1,14 @@
 import { ModelConfig, Provider } from './types';
 
-// Model configurations for all supported LLMs
+// Model configurations for all supported LLMs (only tool-calling enabled models)
 export const MODEL_CONFIGS: ModelConfig[] = [
-  // Groq Models
-  {
-    id: 'qwen3-32b',
-    name: 'Qwen 3 32B',
-    provider: 'groq',
-    model: 'qwen/qwen3-32b',
-    description: 'Alibaba Qwen 3 32B parameter model',
-    maxTokens: 32768,
-    temperature: {
-      min: 0,
-      max: 2,
-      default: 0.7,
-    },
-    capabilities: {
-      streaming: true,
-      functionCalling: false,
-      vision: false,
-    },
-  },
-  {
-    id: 'gemma2-9b-it',
-    name: 'Gemma2 9B IT',
-    provider: 'groq',
-    model: 'gemma2-9b-it',
-    description: 'Google Gemma2 9B instruction-tuned model',
-    maxTokens: 8192,
-    temperature: {
-      min: 0,
-      max: 2,
-      default: 0.7,
-    },
-    capabilities: {
-      streaming: true,
-      functionCalling: false,
-      vision: false,
-    },
-  },
-  {
-    id: 'groq-compound',
-    name: 'Groq Compound',
-    provider: 'groq',
-    model: 'groq/compound',
-    description: "Groq's compound model for various tasks",
-    maxTokens: 8192,
-    temperature: {
-      min: 0,
-      max: 2,
-      default: 0.7,
-    },
-    capabilities: {
-      streaming: true,
-      functionCalling: false,
-      vision: false,
-    },
-  },
+  // Groq Models (only tool-calling enabled)
   {
     id: 'llama-3.1-8b-instant',
     name: 'Llama 3.1 8B Instant',
     provider: 'groq',
     model: 'llama-3.1-8b-instant',
-    description: 'Meta Llama 3.1 8B model - fast and efficient',
+    description: 'Meta Llama 3.1 8B model - fast and efficient with tool calling support',
     maxTokens: 8192,
     temperature: {
       min: 0,
@@ -71,7 +17,7 @@ export const MODEL_CONFIGS: ModelConfig[] = [
     },
     capabilities: {
       streaming: true,
-      functionCalling: false,
+      functionCalling: true,
       vision: false,
     },
   },
@@ -80,7 +26,7 @@ export const MODEL_CONFIGS: ModelConfig[] = [
     name: 'Llama 3.3 70B Versatile',
     provider: 'groq',
     model: 'llama-3.3-70b-versatile',
-    description: 'Meta Llama 3.3 70B model - versatile and capable',
+    description: 'Meta Llama 3.3 70B model - versatile and capable with tool calling support',
     maxTokens: 8192,
     temperature: {
       min: 0,
@@ -89,25 +35,7 @@ export const MODEL_CONFIGS: ModelConfig[] = [
     },
     capabilities: {
       streaming: true,
-      functionCalling: false,
-      vision: false,
-    },
-  },
-  {
-    id: 'llama-4-maverick-17b',
-    name: 'Llama 4 Maverick 17B',
-    provider: 'groq',
-    model: 'meta-llama/llama-4-maverick-17b-128e-instruct',
-    description: 'Meta Llama 4 Maverick 17B instruction model',
-    maxTokens: 128000,
-    temperature: {
-      min: 0,
-      max: 2,
-      default: 0.7,
-    },
-    capabilities: {
-      streaming: true,
-      functionCalling: false,
+      functionCalling: true,
       vision: false,
     },
   },
@@ -116,7 +44,7 @@ export const MODEL_CONFIGS: ModelConfig[] = [
     name: 'GPT-OSS 120B',
     provider: 'groq',
     model: 'openai/gpt-oss-120b',
-    description: 'OpenAI GPT-OSS 120B model',
+    description: 'OpenAI GPT-OSS 120B model with tool calling support',
     maxTokens: 8192,
     temperature: {
       min: 0,
@@ -125,7 +53,7 @@ export const MODEL_CONFIGS: ModelConfig[] = [
     },
     capabilities: {
       streaming: true,
-      functionCalling: false,
+      functionCalling: true,
       vision: false,
     },
   },
@@ -134,7 +62,7 @@ export const MODEL_CONFIGS: ModelConfig[] = [
     name: 'GPT-OSS 20B',
     provider: 'groq',
     model: 'openai/gpt-oss-20b',
-    description: 'OpenAI GPT-OSS 20B model',
+    description: 'OpenAI GPT-OSS 20B model with tool calling support',
     maxTokens: 8192,
     temperature: {
       min: 0,
@@ -143,25 +71,7 @@ export const MODEL_CONFIGS: ModelConfig[] = [
     },
     capabilities: {
       streaming: true,
-      functionCalling: false,
-      vision: false,
-    },
-  },
-  {
-    id: 'playai-tts-arabic',
-    name: 'PlayAI TTS Arabic',
-    provider: 'groq',
-    model: 'playai-tts-arabic',
-    description: 'PlayAI Arabic text-to-speech model',
-    maxTokens: 4096,
-    temperature: {
-      min: 0,
-      max: 2,
-      default: 0.7,
-    },
-    capabilities: {
-      streaming: true,
-      functionCalling: false,
+      functionCalling: true,
       vision: false,
     },
   },
