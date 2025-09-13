@@ -14,11 +14,129 @@ import { Button } from '@/components/ui/button';
 interface Message {
   id: string;
   text: string;
+  mainContent?: string;
   isUser: boolean;
   timestamp: Date;
   isError?: boolean;
   errorType?: string;
   errorProvider?: string;
+  thinking?: string;
+  toolCalls?: ToolCall[];
+}
+
+interface ToolCall {
+  name: string;
+  args: Record<string, unknown>;
+  result?: unknown;
+  success?: boolean;
+}
+
+// Function to parse message content for thinking blocks and tool calls
+function parseMessageContent(content: string): {
+  thinking: string;
+  mainContent: string;
+  toolCalls: ToolCall[];
+} {
+  let thinking = '';
+  let mainContent = content;
+  const toolCalls: ToolCall[] = [];
+
+  // Extract thinking blocks (case insensitive)
+  const thinkingRegex = /<think>([\s\S]*?)<\/think>/gi;
+  const thinkingMatches = content.match(thinkingRegex);
+  
+  if (thinkingMatches) {
+    thinking = thinkingMatches
+      .map(match => match.replace(/<\/?think>/gi, ''))
+      .join('\n\n');
+    
+    // Remove thinking blocks from main content
+    mainContent = content.replace(thinkingRegex, '').trim();
+  } else {
+    // Check for incomplete thinking blocks (for streaming) - more permissive
+    const incompleteThinkingRegex = /<think>([\s\S]*?)(?=<\/think>|$)/gi;
+    const incompleteMatches = content.match(incompleteThinkingRegex);
+    
+    if (incompleteMatches) {
+      thinking = incompleteMatches
+        .map(match => match.replace(/<\/?think>/gi, ''))
+        .join('\n\n');
+      
+      // Remove incomplete thinking blocks from main content
+      mainContent = content.replace(incompleteThinkingRegex, '').trim();
+    } else {
+      // Check for just opening <think> tag (for very early streaming)
+      const openingThinkRegex = /<think>([\s\S]*?)$/gi;
+      const openingMatches = content.match(openingThinkRegex);
+      
+      if (openingMatches) {
+        thinking = openingMatches
+          .map(match => match.replace(/<\/?think>/gi, ''))
+          .join('\n\n');
+        
+        // Don't remove from main content yet as it's incomplete
+        mainContent = content;
+      }
+    }
+  }
+
+  // Extract tool calls with results using <tool></tool> format
+  const toolCallRegex = /<tool\s+name="([^"]+)"\s+args='([^']*)'\s+(?:result='([^']*)'\s+success="true"|error='([^']*)'\s+success="false")[^>]*><\/tool>/g;
+  let toolMatch;
+  
+  while ((toolMatch = toolCallRegex.exec(content)) !== null) {
+    const toolName = toolMatch[1];
+    const argsString = toolMatch[2];
+    const resultString = toolMatch[3];
+    const errorString = toolMatch[4];
+    
+    try {
+      const args = argsString ? JSON.parse(argsString) : {};
+      let result = null;
+      
+      if (resultString) {
+        try {
+          result = JSON.parse(resultString);
+        } catch {
+          result = resultString;
+        }
+      }
+      
+      toolCalls.push({
+        name: toolName,
+        args,
+        result: result,
+        success: !errorString,
+      });
+    } catch {
+      // If JSON parsing fails, store as string
+      toolCalls.push({
+        name: toolName,
+        args: { raw: argsString },
+        result: resultString || errorString,
+        success: !errorString,
+      });
+    }
+  }
+  
+  // Remove tool calls from main content using a fresh regex
+  const toolCallRemoveRegex = /<tool\s+name="([^"]+)"\s+args='([^']*)'\s+(?:result='([^']*)'\s+success="true"|error='([^']*)'\s+success="false")[^>]*><\/tool>/g;
+  mainContent = mainContent.replace(toolCallRemoveRegex, '').trim();
+
+  // Debug logging
+  console.log('Parsing content:', content.substring(0, 200) + '...');
+  
+  if (thinking) {
+    console.log('Parsed thinking:', thinking);
+  }
+  
+  if (toolCalls.length > 0) {
+    console.log('Parsed tool calls:', toolCalls);
+  }
+  
+  console.log('Main content after filtering:', mainContent.substring(0, 100) + '...');
+  
+  return { thinking, mainContent, toolCalls };
 }
 
 export function ChatUIV5() {
@@ -59,6 +177,8 @@ export function ChatUIV5() {
       text: '',
       isUser: false,
       timestamp: new Date(),
+      thinking: '',
+      toolCalls: [],
     };
 
     // Add the empty AI message immediately
@@ -173,13 +293,25 @@ export function ChatUIV5() {
                   const choice = parsedChunk.choices[0];
 
                   if (choice.delta.content) {
-                    // Append content to the AI message
+                    const content = choice.delta.content;
+                    
+                    // Update the message with new content
                     setMessages((prev) =>
-                      prev.map((msg) =>
-                        msg.id === aiMessageId
-                          ? { ...msg, text: msg.text + choice.delta.content }
-                          : msg
-                      )
+                      prev.map((msg) => {
+                        if (msg.id === aiMessageId) {
+                          const newText = msg.text + content;
+                          const { thinking, mainContent, toolCalls } = parseMessageContent(newText);
+                          
+                          return {
+                            ...msg,
+                            text: newText, // Keep the raw text for streaming
+                            mainContent: mainContent, // Store the processed main content
+                            thinking: thinking,
+                            toolCalls: toolCalls,
+                          };
+                        }
+                        return msg;
+                      })
                     );
                   }
 
@@ -338,22 +470,28 @@ export function ChatUIV5() {
             {messages.map((message) => (
               <ChatMessage
                 key={message.id}
-                message={message.text}
+                message={message.mainContent || message.text}
                 isUser={message.isUser}
                 timestamp={message.timestamp}
                 isError={message.isError}
                 errorType={message.errorType}
                 errorProvider={message.errorProvider}
                 onRetry={message.isError ? handleRetry : undefined}
+                thinking={message.thinking}
+                toolCalls={message.toolCalls}
               />
             ))}
             {isLoading && (
               <div className="flex gap-3 p-4">
-                <Avatar className="h-8 w-8">
-                  <AvatarFallback className="bg-blue-600 text-white">
-                    AI
-                  </AvatarFallback>
-                </Avatar>
+                <div className="relative">
+                  <Avatar className="h-8 w-8">
+                    <AvatarFallback className="bg-blue-600 text-white">
+                      AI
+                    </AvatarFallback>
+                  </Avatar>
+                  {/* Thinking animation next to avatar */}
+                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
+                </div>
                 <div className="bg-gray-700 text-gray-100 rounded-lg px-4 py-2">
                   <div className="flex items-center gap-2">
                     <div className="animate-pulse">Thinking...</div>

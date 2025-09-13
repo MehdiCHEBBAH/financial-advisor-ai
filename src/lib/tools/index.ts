@@ -10,22 +10,38 @@ export const searchNewsTool = tool(
     try {
       const apiKey = process.env.MEDIASTACK_API_KEY;
       if (!apiKey) {
-        throw new Error('Mediastack API key not configured');
+        throw new Error('Mediastack API key not configured. Please add MEDIASTACK_API_KEY to your environment variables or configure it in the settings.');
       }
+      
+      console.log('🔧 [TOOL DEBUG] Using Mediastack API key:', apiKey ? `${apiKey.substring(0, 8)}...` : 'NOT SET');
 
       const params = new URLSearchParams({
         access_key: apiKey,
         keywords: query,
-        categories: category,
         languages: 'en',
         limit: limit.toString(),
         sort: 'published_desc',
       });
+      
+      // Only add categories if it's a valid category
+      if (category && category !== 'general') {
+        params.append('categories', category);
+      }
 
-      const response = await fetch(`http://api.mediastack.com/v1/news?${params}`);
+      const url = `http://api.mediastack.com/v1/news?${params}`;
+      console.log('🔧 [TOOL DEBUG] Calling Mediastack API:', url);
+      
+      const response = await fetch(url);
       
       if (!response.ok) {
-        throw new Error(`Mediastack API error: ${response.status} ${response.statusText}`);
+        const errorText = await response.text();
+        console.error('Mediastack API error details:', errorText);
+        
+        if (response.status === 422) {
+          throw new Error(`Mediastack API error: Invalid request parameters. This might be due to an invalid API key or unsupported parameters. Please check your MEDIASTACK_API_KEY.`);
+        }
+        
+        throw new Error(`Mediastack API error: ${response.status} ${response.statusText} - ${errorText}`);
       }
 
       const data = await response.json();

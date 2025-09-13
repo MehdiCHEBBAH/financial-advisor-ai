@@ -79,16 +79,52 @@ export class LLMProvider {
           return new HumanMessage(msg.content); // assistant messages as human for simplicity
         }
       });
+      
+      // Create a mutable copy for tool results
+      const messagesWithTools = [...langchainMessages];
 
       // Get the appropriate LangChain model with tools
       const model = this.getLangChainModelWithTools(modelConfig.provider, config.model, config.apiKey);
 
-      // Stream response with tools
-      const stream = await model.stream(langchainMessages);
+      // First, get the initial response to check for tool calls
+      const initialResult = await model.invoke(langchainMessages);
       
-      for await (const chunk of stream) {
-        if (chunk.content) {
-          yield chunk.content as string;
+      // Check if the result contains tool calls
+      if (initialResult.tool_calls && initialResult.tool_calls.length > 0) {
+        // Execute tool calls
+        for (const toolCall of initialResult.tool_calls) {
+          try {
+            // Find the tool by name
+            const tool = allTools.find(t => t.name === toolCall.name);
+            if (tool) {
+              // Execute the tool
+              const toolResult = await tool.invoke(toolCall.args);
+              
+              // Add tool result to messages
+              messagesWithTools.push(new HumanMessage(`Tool ${toolCall.name} result: ${JSON.stringify(toolResult)}`));
+              
+              // Yield tool call information with result
+              yield `<tool name="${toolCall.name}" args='${JSON.stringify(toolCall.args)}' result='${JSON.stringify(toolResult)}' success="true"></tool>`;
+            }
+          } catch (toolError) {
+            console.error(`Tool ${toolCall.name} execution error:`, toolError);
+            // Add error to messages
+            messagesWithTools.push(new HumanMessage(`Tool ${toolCall.name} error: ${toolError instanceof Error ? toolError.message : 'Unknown error'}`));
+            
+            // Yield tool call information with error
+            yield `<tool name="${toolCall.name}" args='${JSON.stringify(toolCall.args)}' error='${toolError instanceof Error ? toolError.message : 'Unknown error'}' success="false"></tool>`;
+          }
+        }
+        
+        // Get final response after tool execution
+        const finalResult = await model.invoke(messagesWithTools);
+        if (finalResult.content) {
+          yield finalResult.content as string;
+        }
+      } else {
+        // No tool calls, just yield the content
+        if (initialResult.content) {
+          yield initialResult.content as string;
         }
       }
     } catch (error) {

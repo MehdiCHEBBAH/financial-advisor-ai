@@ -42,6 +42,18 @@ When tool calls fail:
 - If API keys are missing or invalid, guide users to configure them in settings
 - Never hide tool errors from users - transparency is important
 
+Response Format:
+- ALWAYS use <think>thinking content</think> tags to show your reasoning process (case insensitive)
+- The thinking content will be displayed above your main response in a collapsible section
+- Use this to show your analysis, considerations, and decision-making process
+- Keep the main response clean and focused on the user's question
+- Example format:
+  <think>
+  Let me analyze this question about [topic]. I need to consider [factors] and use [tools] to get current data.
+  </think>
+  
+  [Your main response here]
+
 Always maintain a professional, helpful, and educational tone while being clear about the limitations of financial advice. Use the available tools to provide the most current and relevant information.`;
   }
 
