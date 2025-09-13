@@ -8,6 +8,7 @@ import { SuggestedMessages } from './suggested-messages';
 import { SettingsPopup } from './settings-popup';
 import { Bot, Settings } from 'lucide-react';
 import { getDefaultModel, getModelConfig } from '@/lib/agent';
+import { APIKeyService } from '@/lib/services';
 import { Button } from '@/components/ui/button';
 
 interface Message {
@@ -79,6 +80,9 @@ export function ChatUI() {
         maxTokens: 1000,
       };
 
+      // Get user API keys to send with request
+      const userApiKeys = APIKeyService.getUserAPIKeys();
+
       // Use agent streaming directly
       const response = await fetch('/api/chat', {
         method: 'POST',
@@ -88,6 +92,7 @@ export function ChatUI() {
         body: JSON.stringify({
           ...agentRequest,
           stream: true,
+          userApiKeys, // Include user API keys in request
         }),
       }).catch(() => {
         // Handle network errors

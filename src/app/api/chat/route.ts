@@ -14,6 +14,7 @@ interface OpenAIRequest {
   stream?: boolean;
   temperature?: number;
   max_tokens?: number;
+  userApiKeys?: Record<string, string>;
 }
 
 interface OpenAIStreamChunk {
@@ -79,6 +80,25 @@ export async function POST(request: NextRequest) {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
       });
+    }
+
+    // Set user API keys in environment for this request
+    if (body.userApiKeys) {
+      for (const [provider, apiKey] of Object.entries(body.userApiKeys)) {
+        if (apiKey) {
+          // Map provider to environment variable name
+          const envVarMap: Record<string, string> = {
+            groq: 'GROQ_API_KEY',
+            openai: 'OPENAI_API_KEY',
+            google: 'GOOGLE_GENERATIVE_AI_API_KEY',
+            deepseek: 'DEEPSEEK_API_KEY',
+          };
+          const envVar = envVarMap[provider];
+          if (envVar) {
+            process.env[envVar] = apiKey;
+          }
+        }
+      }
     }
 
     // Initialize agent

@@ -51,6 +51,21 @@ export class APIKeyService {
   }
 
   /**
+   * Set a single API key for a provider
+   */
+  static setAPIKey(provider: string, apiKey: string): void {
+    if (typeof window === 'undefined') return;
+
+    try {
+      const userKeys = this.getUserAPIKeys();
+      userKeys[provider as keyof UserAPIKeys] = apiKey;
+      this.saveUserAPIKeys(userKeys);
+    } catch (error) {
+      console.error('Failed to set API key:', error);
+    }
+  }
+
+  /**
    * Check if a specific API key is configured (user or environment)
    */
   static isAPIKeyConfigured(provider: string): boolean {
