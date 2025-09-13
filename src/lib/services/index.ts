@@ -13,3 +13,7 @@ export interface ServiceResponse<T> {
   data?: T;
   error?: ServiceError;
 }
+
+// API Key service
+export { APIKeyService } from './api-key.service';
+export type { UserAPIKeys } from '@/lib/agent/types';
