@@ -1,6 +1,31 @@
 import { z } from 'zod';
 import { tool } from '@langchain/core/tools';
 
+// Helper function to normalize keywords
+function normalizeKeywords(keywords: string): string {
+  // Remove extra spaces and convert to lowercase
+  const cleaned = keywords.toLowerCase().trim();
+  
+  // Split by comma and clean each keyword
+  const keywordArray = cleaned.split(',').map(k => k.trim()).filter(k => k.length > 0);
+  
+  // If keywords contain spaces (phrases), split them into individual words
+  const individualWords: string[] = [];
+  keywordArray.forEach(keyword => {
+    if (keyword.includes(' ')) {
+      // Split phrases into individual words
+      const words = keyword.split(/\s+/).filter(w => w.length > 0);
+      individualWords.push(...words);
+    } else {
+      individualWords.push(keyword);
+    }
+  });
+  
+  // Remove duplicates and join with commas
+  const uniqueWords = [...new Set(individualWords)];
+  return uniqueWords.join(',');
+}
+
 // Live News tool
 export const searchLiveNewsTool = tool(
   async (input) => {
@@ -21,9 +46,13 @@ export const searchLiveNewsTool = tool(
       
       console.log('🔧 [TOOL DEBUG] Using Mediastack API key:', apiKey ? `${apiKey.substring(0, 8)}...` : 'NOT SET');
 
+      // Normalize keywords to ensure they are individual words
+      const normalizedKeywords = normalizeKeywords(keywords);
+      console.log('🔧 [TOOL DEBUG] Normalized keywords:', normalizedKeywords);
+
       const params = new URLSearchParams({
         access_key: apiKey,
-        keywords: keywords,
+        keywords: normalizedKeywords,
         languages: 'en',
         limit: limit.toString(),
         sort: 'published_desc',
@@ -44,6 +73,7 @@ export const searchLiveNewsTool = tool(
 
       const url = `https://api.mediastack.com/v1/news?${params}`;
       console.log('🔧 [TOOL DEBUG] Calling Mediastack API for live news:', url);
+      console.log('🔧 [TOOL DEBUG] Full params:', Object.fromEntries(params));
       
       const response = await fetch(url);
       
@@ -82,7 +112,7 @@ export const searchLiveNewsTool = tool(
 
       return {
         success: true,
-        message: `Found ${articles.length} live news articles for keywords: "${keywords}"`,
+        message: `Found ${articles.length} live news articles for keywords: "${normalizedKeywords}"`,
         articles,
         total: data.pagination?.total || articles.length,
       };
@@ -146,9 +176,13 @@ export const searchHistoricalNewsTool = tool(
       
       console.log('🔧 [TOOL DEBUG] Using Mediastack API key:', apiKey ? `${apiKey.substring(0, 8)}...` : 'NOT SET');
 
+      // Normalize keywords to ensure they are individual words
+      const normalizedKeywords = normalizeKeywords(keywords);
+      console.log('🔧 [TOOL DEBUG] Normalized keywords:', normalizedKeywords);
+
       const params = new URLSearchParams({
         access_key: apiKey,
-        keywords: keywords,
+        keywords: normalizedKeywords,
         date: date,
         languages: 'en',
         limit: limit.toString(),
@@ -170,6 +204,7 @@ export const searchHistoricalNewsTool = tool(
 
       const url = `https://api.mediastack.com/v1/news?${params}`;
       console.log('🔧 [TOOL DEBUG] Calling Mediastack API for historical news:', url);
+      console.log('🔧 [TOOL DEBUG] Full params:', Object.fromEntries(params));
       
       const response = await fetch(url);
       
@@ -187,6 +222,67 @@ export const searchHistoricalNewsTool = tool(
       const data = await response.json();
 
       if (!data.data || data.data.length === 0) {
+        // Try a broader date range if specific date returns no results
+        console.log('🔧 [TOOL DEBUG] No results for specific date, trying broader range...');
+        
+        // If it's a specific date, try a month range around it
+        if (date && !date.includes(',')) {
+          const dateObj = new Date(date);
+          const year = dateObj.getFullYear();
+          const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+          const startDate = `${year}-${month}-01`;
+          const endDate = `${year}-${month}-31`;
+          const rangeDate = `${startDate},${endDate}`;
+          
+          console.log('🔧 [TOOL DEBUG] Trying date range:', rangeDate);
+          
+          const rangeParams = new URLSearchParams({
+            access_key: apiKey,
+            keywords: normalizedKeywords,
+            date: rangeDate,
+            languages: 'en',
+            limit: limit.toString(),
+            sort: 'published_desc',
+          });
+          
+          if (category && category !== 'general') {
+            rangeParams.append('categories', category);
+          }
+          if (countries) {
+            rangeParams.append('countries', countries);
+          }
+          if (sources) {
+            rangeParams.append('sources', sources);
+          }
+          
+          const rangeUrl = `https://api.mediastack.com/v1/news?${rangeParams}`;
+          console.log('🔧 [TOOL DEBUG] Trying range URL:', rangeUrl);
+          
+          const rangeResponse = await fetch(rangeUrl);
+          if (rangeResponse.ok) {
+            const rangeData = await rangeResponse.json();
+            if (rangeData.data && rangeData.data.length > 0) {
+              const rangeArticles = rangeData.data.map((article: Record<string, unknown>) => ({
+                title: article.title,
+                description: article.description,
+                source: article.source,
+                url: article.url,
+                publishedAt: article.published_at,
+                category: article.category,
+                country: article.country,
+                language: article.language,
+              }));
+              
+              return {
+                success: true,
+                message: `Found ${rangeArticles.length} historical news articles for keywords: "${normalizedKeywords}" in ${year}-${month}`,
+                articles: rangeArticles,
+                total: rangeData.pagination?.total || rangeArticles.length,
+              };
+            }
+          }
+        }
+        
         return {
           success: true,
           message: `No historical news articles found for the given keywords on ${date}.`,
@@ -208,7 +304,7 @@ export const searchHistoricalNewsTool = tool(
 
       return {
         success: true,
-        message: `Found ${articles.length} historical news articles for keywords: "${keywords}" on ${date}`,
+        message: `Found ${articles.length} historical news articles for keywords: "${normalizedKeywords}" on ${date}`,
         articles,
         total: data.pagination?.total || articles.length,
       };

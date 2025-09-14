@@ -7,7 +7,7 @@ import { ChatOpenAI } from '@langchain/openai';
 import { ChatGroq } from '@langchain/groq';
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { ChatDeepSeek } from '@langchain/deepseek';
-import { HumanMessage, SystemMessage } from '@langchain/core/messages';
+import { HumanMessage, SystemMessage, ToolMessage } from '@langchain/core/messages';
 
 // LLM Provider implementations using LangChain
 export class LLMProvider {
@@ -105,13 +105,32 @@ export class LLMProvider {
           }
         }
         
-        // Step 3: Add tool results to conversation and get final response
+        // Step 3: Create proper tool messages for each tool call
+        const toolMessages = initialResult.tool_calls.map(toolCall => {
+          const result = toolResults.find(r => r.name === toolCall.name);
+          return new ToolMessage({
+            content: JSON.stringify(result?.result || { error: 'Tool execution failed' }),
+            tool_call_id: toolCall.id || `call_${Date.now()}_${Math.random()}`,
+          });
+        });
+
+        // Step 4: Create conversation with proper tool message format
         const messagesWithToolResults = [
           ...langchainMessages,
-          new HumanMessage(`Tool execution results: ${JSON.stringify(toolResults)}`)
+          initialResult, // Include the assistant's message with tool calls
+          ...toolMessages, // Add proper tool messages
+          new HumanMessage(`Based on the tool results above, please provide a comprehensive response to the user's question. Analyze the tool results and give a helpful, informative answer.`)
         ];
         
+        console.log('🔧 [LLM DEBUG] Getting final response with tool results...');
+        console.log('🔧 [LLM DEBUG] Messages count:', messagesWithToolResults.length);
+        console.log('🔧 [LLM DEBUG] Tool results count:', toolResults.length);
+        
         const finalResult = await model.invoke(messagesWithToolResults);
+        
+        console.log('🔧 [LLM DEBUG] Final result received:', !!finalResult);
+        console.log('🔧 [LLM DEBUG] Final result content length:', (finalResult.content as string)?.length || 0);
+        console.log('🔧 [LLM DEBUG] Final result content preview:', (finalResult.content as string)?.substring(0, 200) + '...');
         
         // Parse the final response
         const { thinking: finalThinking, mainContent: finalMainContent } = this.parseResponse(finalResult.content as string);
@@ -212,13 +231,31 @@ export class LLMProvider {
           }
         }
         
-        // Step 3: Add tool results to conversation and get final response
+        // Step 3: Create proper tool messages for each tool call
+        const toolMessages = initialResult.tool_calls.map(toolCall => {
+          const result = toolResults.find(r => r.name === toolCall.name);
+          return new ToolMessage({
+            content: JSON.stringify(result?.result || { error: 'Tool execution failed' }),
+            tool_call_id: toolCall.id || `call_${Date.now()}_${Math.random()}`,
+          });
+        });
+
+        // Step 4: Create conversation with proper tool message format
         const messagesWithToolResults = [
           ...langchainMessages,
-          new HumanMessage(`Tool execution results: ${JSON.stringify(toolResults)}`)
+          initialResult, // Include the assistant's message with tool calls
+          ...toolMessages, // Add proper tool messages
+          new HumanMessage(`Based on the tool results above, please provide a comprehensive response to the user's question. Analyze the tool results and give a helpful, informative answer.`)
         ];
         
+        console.log('🔧 [LLM DEBUG] Getting final response with tool results...');
+        console.log('🔧 [LLM DEBUG] Messages count:', messagesWithToolResults.length);
+        console.log('🔧 [LLM DEBUG] Tool results count:', toolResults.length);
+        
         const finalResult = await model.invoke(messagesWithToolResults);
+        
+        console.log('🔧 [LLM DEBUG] Final result received:', !!finalResult);
+        console.log('🔧 [LLM DEBUG] Final result content length:', (finalResult.content as string)?.length || 0);
         
         // Step 4: Add tools section and final response
         if (toolResults.length > 0) {
