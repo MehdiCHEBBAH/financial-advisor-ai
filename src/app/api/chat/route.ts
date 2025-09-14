@@ -89,23 +89,13 @@ export async function POST(request: NextRequest) {
     // Convert OpenAI format to UIMessage format
     const uiMessages: AgentMessage[] = FinancialAgent.convertFromOpenAIFormat(body.messages);
 
-    // If streaming is requested (default for OpenAI)
-    if (body.stream !== false) {
-      return createAgentStreamingResponse(
-        uiMessages,
-        body.model,
-        body.temperature,
-        body.max_tokens
-      );
-    } else {
-      // Non-streaming response
-      return createAgentNonStreamingResponse(
-        uiMessages,
-        body.model,
-        body.temperature,
-        body.max_tokens
-      );
-    }
+    // Always use non-streaming for simplicity and reliability
+    return createAgentNonStreamingResponse(
+      uiMessages,
+      body.model,
+      body.temperature,
+      body.max_tokens
+    );
   } catch (error) {
     console.error('Chat API error:', error);
 
@@ -168,141 +158,6 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// AI SDK 5 streaming response using standard streaming
-async function createAgentStreamingResponse(
-  uiMessages: AgentMessage[],
-  model: string,
-  temperature?: number,
-  maxTokens?: number
-) {
-  const stream = new ReadableStream({
-    async start(controller) {
-      const encoder = new TextEncoder();
-      const chunkId = `chatcmpl-${Date.now()}`;
-
-      try {
-        // Send initial role chunk
-        const roleChunk = {
-          id: chunkId,
-          object: 'chat.completion.chunk',
-          created: Math.floor(Date.now() / 1000),
-          model: model,
-          choices: [
-            {
-              index: 0,
-              delta: { role: 'assistant' },
-              finish_reason: null,
-            },
-          ],
-        };
-        controller.enqueue(
-          encoder.encode(`data: ${JSON.stringify(roleChunk)}\n\n`)
-        );
-
-        // Initialize agent
-        const agent = new FinancialAgent();
-        
-        // Stream response from agent
-        for await (const chunk of agent.processMessageStream({
-          messages: uiMessages,
-          model,
-          temperature,
-          maxOutputTokens: maxTokens,
-        })) {
-          const contentChunk = {
-            id: chunkId,
-            object: 'chat.completion.chunk',
-            created: Math.floor(Date.now() / 1000),
-            model: model,
-            choices: [
-              {
-                index: 0,
-                delta: { content: chunk },
-                finish_reason: null,
-              },
-            ],
-          };
-          controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify(contentChunk)}\n\n`)
-          );
-        }
-
-        // Send completion chunk
-        const completionChunk = {
-          id: chunkId,
-          object: 'chat.completion.chunk',
-          created: Math.floor(Date.now() / 1000),
-          model: model,
-          choices: [
-            {
-              index: 0,
-              delta: {},
-              finish_reason: 'stop',
-            },
-          ],
-        };
-        controller.enqueue(
-          encoder.encode(`data: ${JSON.stringify(completionChunk)}\n\n`)
-        );
-
-        // Send final done signal
-        controller.enqueue(encoder.encode('data: [DONE]\n\n'));
-        controller.close();
-      } catch (error) {
-        console.error('Streaming error:', error);
-        
-        // Send error as a special error chunk
-        const errorMessage = error instanceof Error ? error.message : 'Streaming error occurred';
-        let errorType = 'unknown';
-
-        // Categorize streaming errors
-        if (errorMessage.includes('API key not configured') || errorMessage.includes('API key')) {
-          errorType = 'missing_key';
-        } else if (errorMessage.includes('quota') || errorMessage.includes('billing') || errorMessage.includes('rate limit')) {
-          errorType = 'quota_exceeded';
-        } else if (errorMessage.includes('not supported') || errorMessage.includes('not available') || errorMessage.includes('model')) {
-          errorType = 'model_not_supported';
-        } else if (errorMessage.includes('network') || errorMessage.includes('connection') || errorMessage.includes('timeout')) {
-          errorType = 'network_error';
-        } else if (errorMessage.includes('authentication') || errorMessage.includes('unauthorized')) {
-          errorType = 'authentication_error';
-        }
-
-        const errorChunk = {
-          id: chunkId,
-          object: 'chat.completion.chunk',
-          created: Math.floor(Date.now() / 1000),
-          model: model,
-          error: {
-            message: errorMessage,
-            type: errorType,
-            timestamp: new Date().toISOString(),
-          },
-          choices: [
-            {
-              index: 0,
-              delta: {},
-              finish_reason: 'stop',
-            },
-          ],
-        };
-        controller.enqueue(
-          encoder.encode(`data: ${JSON.stringify(errorChunk)}\n\n`)
-        );
-        controller.enqueue(encoder.encode('data: [DONE]\n\n'));
-        controller.close();
-      }
-    },
-  });
-
-  return new Response(stream, {
-    headers: {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      Connection: 'keep-alive',
-    },
-  });
-}
 
 // Non-streaming response using AI SDK 5 patterns
 async function createAgentNonStreamingResponse(
@@ -334,6 +189,8 @@ async function createAgentNonStreamingResponse(
           message: {
             role: 'assistant',
             content: response.content,
+            thinking: response.thinking,
+            toolCalls: response.toolCalls,
           },
           finish_reason: 'stop',
         },

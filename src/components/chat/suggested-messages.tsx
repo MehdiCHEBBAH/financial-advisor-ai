@@ -37,6 +37,7 @@ const suggestedMessages: SuggestedMessage[] = [
 ];
 
 export function SuggestedMessages({ onMessageSelect }: SuggestedMessagesProps) {
+  console.log('SuggestedMessages component rendered');
   return (
     <div className="p-6">
       <h3 className="text-sm font-medium text-gray-400 mb-4">
@@ -47,8 +48,11 @@ export function SuggestedMessages({ onMessageSelect }: SuggestedMessagesProps) {
           <Button
             key={message.id}
             variant="outline"
-            className="h-auto p-4 justify-start text-left hover:bg-gray-800"
-            onClick={() => onMessageSelect(message.text)}
+            className="h-auto p-4 justify-start text-left border-gray-600 text-gray-200 hover:bg-gray-800 hover:text-white"
+            onClick={() => {
+              console.log('Button clicked for message:', message.text);
+              onMessageSelect(message.text);
+            }}
           >
             <div className="flex items-center gap-3">
               {message.icon}

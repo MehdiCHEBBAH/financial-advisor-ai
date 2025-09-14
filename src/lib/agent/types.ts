@@ -12,9 +12,18 @@ export interface AgentRequest {
   maxOutputTokens?: number;
 }
 
+export interface ToolCall {
+  name: string;
+  args: Record<string, unknown>;
+  result?: unknown;
+  success?: boolean;
+}
+
 export interface AgentResponse {
   content: string;
   model: string;
+  thinking?: string;
+  toolCalls?: ToolCall[];
 }
 
 export interface ModelConfig {
@@ -52,6 +61,8 @@ export interface UserAPIKeys {
 
 export interface ModelStatus {
   id: string;
+  name: string;
+  provider: string;
   configured: boolean;
   error?: string;
   requiresUserKey?: boolean;

@@ -1,11 +1,17 @@
 import { z } from 'zod';
 import { tool } from '@langchain/core/tools';
 
-// News tool
-export const searchNewsTool = tool(
+// Live News tool
+export const searchLiveNewsTool = tool(
   async (input) => {
-    const { query, limit = 5, category = 'business' } = input as { query: string; limit?: number; category?: string };
-    console.log('🔧 [TOOL DEBUG] searchNewsTool called with:', { query, limit, category });
+    const { keywords, limit = 5, category = 'business', countries, sources } = input as { 
+      keywords: string; 
+      limit?: number; 
+      category?: string; 
+      countries?: string; 
+      sources?: string; 
+    };
+    console.log('🔧 [TOOL DEBUG] searchLiveNewsTool called with:', { keywords, limit, category, countries, sources });
     
     try {
       const apiKey = process.env.MEDIASTACK_API_KEY;
@@ -17,19 +23,27 @@ export const searchNewsTool = tool(
 
       const params = new URLSearchParams({
         access_key: apiKey,
-        keywords: query,
+        keywords: keywords,
         languages: 'en',
         limit: limit.toString(),
         sort: 'published_desc',
       });
       
-      // Only add categories if it's a valid category
+      // Add optional parameters
       if (category && category !== 'general') {
         params.append('categories', category);
       }
+      
+      if (countries) {
+        params.append('countries', countries);
+      }
+      
+      if (sources) {
+        params.append('sources', sources);
+      }
 
-      const url = `http://api.mediastack.com/v1/news?${params}`;
-      console.log('🔧 [TOOL DEBUG] Calling Mediastack API:', url);
+      const url = `https://api.mediastack.com/v1/news?${params}`;
+      console.log('🔧 [TOOL DEBUG] Calling Mediastack API for live news:', url);
       
       const response = await fetch(url);
       
@@ -49,7 +63,7 @@ export const searchNewsTool = tool(
       if (!data.data || data.data.length === 0) {
         return {
           success: true,
-          message: 'No news articles found for the given query.',
+          message: 'No live news articles found for the given keywords.',
           articles: [],
           total: 0,
         };
@@ -62,18 +76,20 @@ export const searchNewsTool = tool(
         url: article.url,
         publishedAt: article.published_at,
         category: article.category,
+        country: article.country,
+        language: article.language,
       }));
 
       return {
         success: true,
-        message: `Found ${articles.length} news articles about "${query}"`,
+        message: `Found ${articles.length} live news articles for keywords: "${keywords}"`,
         articles,
-        total: data.pagination.total,
+        total: data.pagination?.total || articles.length,
       };
     } catch (error) {
-      console.error('News search error:', error);
+      console.error('Live news search error:', error);
       
-      let errorMessage = 'Failed to search news';
+      let errorMessage = 'Failed to search live news';
       if (error instanceof Error) {
         if (error.message.includes('401') || error.message.includes('Unauthorized')) {
           errorMessage = 'Mediastack API key is invalid or missing. Please configure your API key in settings.';
@@ -84,7 +100,7 @@ export const searchNewsTool = tool(
         } else if (error.message.includes('network') || error.message.includes('fetch')) {
           errorMessage = 'Network error. Please check your internet connection.';
         } else {
-          errorMessage = `News search failed: ${error.message}`;
+          errorMessage = `Live news search failed: ${error.message}`;
         }
       }
       
@@ -97,12 +113,143 @@ export const searchNewsTool = tool(
     }
   },
   {
-    name: 'searchNews',
-    description: 'Search for the latest financial and business news articles. Use this to get current market news, company updates, and financial developments.',
+    name: 'searchLiveNews',
+    description: 'Search for the latest live financial and business news articles. Use this to get current market news, company updates, and financial developments in real-time. IMPORTANT: Use individual keywords separated by commas, NOT sentences or phrases.',
     schema: z.object({
-      query: z.string().describe('Search query for news articles (e.g., "Apple stock", "Federal Reserve", "Tesla earnings")'),
+      keywords: z.string().describe('CRITICAL: Use individual keywords separated by commas, NOT sentences. Examples: "Apple,stock,earnings" or "Federal,Reserve,rates" or "market,trends,analysis". DO NOT use phrases like "Apple stock earnings" or "market trends analysis".'),
       limit: z.number().optional().describe('Number of articles to return (default: 5, max: 100)'),
-      category: z.string().optional().describe('News category: general, business, entertainment, health, science, sports, technology')
+      category: z.string().optional().describe('News category: general, business, entertainment, health, science, sports, technology'),
+      countries: z.string().optional().describe('Comma-separated country codes (e.g., "us,gb,de" for USA, UK, Germany)'),
+      sources: z.string().optional().describe('Comma-separated news sources (e.g., "cnn,bbc,reuters")')
+    }),
+  }
+);
+
+// Historical News tool
+export const searchHistoricalNewsTool = tool(
+  async (input) => {
+    const { keywords, date, limit = 5, category = 'business', countries, sources } = input as { 
+      keywords: string; 
+      date: string; 
+      limit?: number; 
+      category?: string; 
+      countries?: string; 
+      sources?: string; 
+    };
+    console.log('🔧 [TOOL DEBUG] searchHistoricalNewsTool called with:', { keywords, date, limit, category, countries, sources });
+    
+    try {
+      const apiKey = process.env.MEDIASTACK_API_KEY;
+      if (!apiKey) {
+        throw new Error('Mediastack API key not configured. Please add MEDIASTACK_API_KEY to your environment variables or configure it in the settings.');
+      }
+      
+      console.log('🔧 [TOOL DEBUG] Using Mediastack API key:', apiKey ? `${apiKey.substring(0, 8)}...` : 'NOT SET');
+
+      const params = new URLSearchParams({
+        access_key: apiKey,
+        keywords: keywords,
+        date: date,
+        languages: 'en',
+        limit: limit.toString(),
+        sort: 'published_desc',
+      });
+      
+      // Add optional parameters
+      if (category && category !== 'general') {
+        params.append('categories', category);
+      }
+      
+      if (countries) {
+        params.append('countries', countries);
+      }
+      
+      if (sources) {
+        params.append('sources', sources);
+      }
+
+      const url = `https://api.mediastack.com/v1/news?${params}`;
+      console.log('🔧 [TOOL DEBUG] Calling Mediastack API for historical news:', url);
+      
+      const response = await fetch(url);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Mediastack API error details:', errorText);
+        
+        if (response.status === 422) {
+          throw new Error(`Mediastack API error: Invalid request parameters. This might be due to an invalid API key, unsupported parameters, or invalid date format. Please check your MEDIASTACK_API_KEY and date format.`);
+        }
+        
+        throw new Error(`Mediastack API error: ${response.status} ${response.statusText} - ${errorText}`);
+      }
+
+      const data = await response.json();
+
+      if (!data.data || data.data.length === 0) {
+        return {
+          success: true,
+          message: `No historical news articles found for the given keywords on ${date}.`,
+          articles: [],
+          total: 0,
+        };
+      }
+
+      const articles = data.data.map((article: Record<string, unknown>) => ({
+        title: article.title,
+        description: article.description,
+        source: article.source,
+        url: article.url,
+        publishedAt: article.published_at,
+        category: article.category,
+        country: article.country,
+        language: article.language,
+      }));
+
+      return {
+        success: true,
+        message: `Found ${articles.length} historical news articles for keywords: "${keywords}" on ${date}`,
+        articles,
+        total: data.pagination?.total || articles.length,
+      };
+    } catch (error) {
+      console.error('Historical news search error:', error);
+      
+      let errorMessage = 'Failed to search historical news';
+      if (error instanceof Error) {
+        if (error.message.includes('401') || error.message.includes('Unauthorized')) {
+          errorMessage = 'Mediastack API key is invalid or missing. Please configure your API key in settings.';
+        } else if (error.message.includes('403') || error.message.includes('Forbidden')) {
+          errorMessage = 'Access forbidden. Please check your Mediastack API key permissions.';
+        } else if (error.message.includes('429') || error.message.includes('rate limit')) {
+          errorMessage = 'Rate limit exceeded. Please try again later.';
+        } else if (error.message.includes('network') || error.message.includes('fetch')) {
+          errorMessage = 'Network error. Please check your internet connection.';
+        } else if (error.message.includes('date') || error.message.includes('validation')) {
+          errorMessage = 'Invalid date format. Please use YYYY-MM-DD format (e.g., "2024-01-15") or date range (e.g., "2024-01-01,2024-01-31").';
+        } else {
+          errorMessage = `Historical news search failed: ${error.message}`;
+        }
+      }
+      
+      return {
+        success: false,
+        message: errorMessage,
+        articles: [],
+        total: 0,
+      };
+    }
+  },
+  {
+    name: 'searchHistoricalNews',
+    description: 'Search for historical financial and business news articles from specific dates. Use this to get news from past events, market movements, or company announcements. IMPORTANT: Use individual keywords separated by commas, NOT sentences or phrases.',
+    schema: z.object({
+      keywords: z.string().describe('CRITICAL: Use individual keywords separated by commas, NOT sentences. Examples: "Apple,stock,earnings" or "Federal,Reserve,rates" or "market,crash,2020". DO NOT use phrases like "Apple stock earnings" or "market crash 2020".'),
+      date: z.string().describe('Date for historical news in YYYY-MM-DD format (e.g., "2024-01-15") or date range (e.g., "2024-01-01,2024-01-31")'),
+      limit: z.number().optional().describe('Number of articles to return (default: 5, max: 100)'),
+      category: z.string().optional().describe('News category: general, business, entertainment, health, science, sports, technology'),
+      countries: z.string().optional().describe('Comma-separated country codes (e.g., "us,gb,de" for USA, UK, Germany)'),
+      sources: z.string().optional().describe('Comma-separated news sources (e.g., "cnn,bbc,reuters")')
     }),
   }
 );
@@ -339,4 +486,4 @@ export const searchStockSymbolsTool = tool(
   }
 );
 
-export const allTools = [searchNewsTool, searchStockDataTool, searchStockSymbolsTool];
+export const allTools = [searchLiveNewsTool, searchHistoricalNewsTool, searchStockDataTool, searchStockSymbolsTool];

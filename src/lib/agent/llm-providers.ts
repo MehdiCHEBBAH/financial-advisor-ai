@@ -1,4 +1,4 @@
-import { ModelConfig, AgentResponse } from './types';
+import { ModelConfig, AgentResponse, ToolCall } from './types';
 import { APIKeyService } from '@/lib/services';
 import { allTools } from '@/lib/tools';
 
@@ -50,13 +50,100 @@ export class LLMProvider {
       // Get the appropriate LangChain model with tools
       const model = this.getLangChainModelWithTools(modelConfig.provider, config.model, config.apiKey);
 
-      // Generate response with tools
-      const result = await model.invoke(langchainMessages);
-
-      return {
-        content: result.content as string,
-        model: modelConfig.id,
-      };
+      // Step 1: Get initial response with thinking and tool calls
+      const initialResult = await model.invoke(langchainMessages);
+      
+      // Parse the initial response to extract thinking and tool calls
+      const { thinking, mainContent: initialMainContent } = this.parseResponse(initialResult.content as string);
+      
+      // Extract tool calls from the initial result
+      const initialToolCalls = this.extractToolCalls(initialResult);
+      
+      // Step 2: Execute tools if any were called
+      const toolResults: Array<{name: string, args: Record<string, unknown>, result: unknown, success: boolean}> = [];
+      
+      if (initialResult.tool_calls && initialResult.tool_calls.length > 0) {
+        console.log('🔧 [LLM DEBUG] Executing tools in non-streaming mode:', initialResult.tool_calls.length);
+        
+        // Execute all tool calls
+        for (const toolCall of initialResult.tool_calls) {
+          try {
+            // Find the tool by name
+            const tool = allTools.find(t => t.name === toolCall.name);
+            if (tool) {
+              console.log('🔧 [LLM DEBUG] Executing tool:', toolCall.name, 'with args:', toolCall.args);
+              
+              // Execute the tool
+              const toolResult = await tool.invoke(toolCall.args);
+              
+              toolResults.push({
+                name: toolCall.name,
+                args: toolCall.args,
+                result: toolResult,
+                success: true
+              });
+              
+              console.log('🔧 [LLM DEBUG] Tool execution successful:', toolCall.name);
+            } else {
+              console.error('🔧 [LLM DEBUG] Tool not found:', toolCall.name);
+              toolResults.push({
+                name: toolCall.name,
+                args: toolCall.args,
+                result: `Tool ${toolCall.name} not found`,
+                success: false
+              });
+            }
+          } catch (toolError) {
+            console.error(`🔧 [LLM DEBUG] Tool ${toolCall.name} execution error:`, toolError);
+            
+            toolResults.push({
+              name: toolCall.name,
+              args: toolCall.args,
+              result: toolError instanceof Error ? toolError.message : 'Unknown error',
+              success: false
+            });
+          }
+        }
+        
+        // Step 3: Add tool results to conversation and get final response
+        const messagesWithToolResults = [
+          ...langchainMessages,
+          new HumanMessage(`Tool execution results: ${JSON.stringify(toolResults)}`)
+        ];
+        
+        const finalResult = await model.invoke(messagesWithToolResults);
+        
+        // Parse the final response
+        const { thinking: finalThinking, mainContent: finalMainContent } = this.parseResponse(finalResult.content as string);
+        
+        // Combine thinking from both responses
+        const combinedThinking = [thinking, finalThinking].filter(Boolean).join('\n\n');
+        
+        // Update tool calls with results
+        const updatedToolCalls = initialToolCalls.map(toolCall => {
+          const result = toolResults.find(r => r.name === toolCall.name);
+          return {
+            ...toolCall,
+            result: result?.result,
+            success: result?.success
+          };
+        });
+        
+        return {
+          content: finalMainContent || finalResult.content as string,
+          model: modelConfig.id,
+          thinking: combinedThinking || undefined,
+          toolCalls: updatedToolCalls.length > 0 ? updatedToolCalls : undefined,
+        };
+      } else {
+        // No tools called, return initial response
+        return {
+          content: initialMainContent || initialResult.content as string,
+          model: modelConfig.id,
+          thinking: thinking || undefined,
+          toolCalls: initialToolCalls.length > 0 ? initialToolCalls : undefined,
+        };
+      }
     } catch (error) {
       console.error('LLM Provider error:', error);
       throw error;
@@ -237,5 +324,71 @@ export class LLMProvider {
     }
 
     return { thinking, mainContent };
+  }
+
+  private static extractToolCalls(result: { tool_calls?: Array<{ function?: { name?: string; arguments?: string }; name?: string; args?: Record<string, unknown>; result?: unknown; success?: boolean }>; content?: string | unknown }): ToolCall[] {
+    const toolCalls: ToolCall[] = [];
+    
+    // Check if the result has tool calls
+    if (result.tool_calls && Array.isArray(result.tool_calls)) {
+      for (const toolCall of result.tool_calls) {
+        toolCalls.push({
+          name: toolCall.function?.name || toolCall.name || 'unknown',
+          args: toolCall.function?.arguments ? JSON.parse(toolCall.function.arguments) : toolCall.args || {},
+          result: toolCall.result,
+          success: toolCall.success !== false, // Default to true if not specified
+        });
+      }
+    }
+    
+    // Also check for tool calls in the content if they're embedded as text
+    const contentString = typeof result.content === 'string' ? result.content : String(result.content || '');
+    if (contentString) {
+      const toolsSectionRegex = /<tools>([\s\S]*?)<\/tools>/gi;
+      const toolsSectionMatch = contentString.match(toolsSectionRegex);
+      
+      if (toolsSectionMatch) {
+        const toolsSection = toolsSectionMatch[0];
+        const toolCallRegex = /<tool\s+name="([^"]+)"\s+args='([^']*)'\s+(?:result='([^']*)'\s+success="true"|error='([^']*)'\s+success="false")[^>]*><\/tool>/g;
+        let toolMatch;
+        
+        while ((toolMatch = toolCallRegex.exec(toolsSection)) !== null) {
+          const toolName = toolMatch[1];
+          const argsString = toolMatch[2];
+          const resultString = toolMatch[3];
+          const errorString = toolMatch[4];
+          
+          try {
+            const args = argsString ? JSON.parse(argsString) : {};
+            let result = null;
+            
+            if (resultString) {
+              try {
+                result = JSON.parse(resultString);
+              } catch {
+                result = resultString;
+              }
+            }
+            
+            toolCalls.push({
+              name: toolName,
+              args,
+              result: result,
+              success: !errorString,
+            });
+          } catch {
+            // If JSON parsing fails, store as string
+            toolCalls.push({
+              name: toolName,
+              args: { raw: argsString },
+              result: resultString || errorString,
+              success: !errorString,
+            });
+          }
+        }
+      }
+    }
+    
+    return toolCalls;
   }
 }

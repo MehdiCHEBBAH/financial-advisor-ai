@@ -35,6 +35,7 @@ interface ChatMessageProps {
   readonly onRetry?: () => void;
   readonly thinking?: string;
   readonly toolCalls?: ToolCall[];
+  readonly isLoading?: boolean;
 }
 
 export function ChatMessage({
@@ -47,6 +48,7 @@ export function ChatMessage({
   onRetry,
   thinking,
   toolCalls = [],
+  isLoading = false,
 }: ChatMessageProps) {
   const [isThinkingExpanded, setIsThinkingExpanded] = useState(false);
   const [isToolCallsExpanded, setIsToolCallsExpanded] = useState(false);
@@ -61,9 +63,9 @@ export function ChatMessage({
             <AvatarFallback className="bg-blue-600 text-white">AI</AvatarFallback>
           </Avatar>
           {/* Thinking animation next to avatar */}
-          {thinking && !isThinkingExpanded && (
+          {(thinking && !isThinkingExpanded) || isLoading ? (
             <div className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
-          )}
+          ) : null}
         </div>
       )}
 
@@ -176,61 +178,81 @@ export function ChatMessage({
             </div>
           )}
           
-          {/* Markdown Content */}
-          <div className="prose prose-invert prose-sm max-w-none">
-            <ReactMarkdown
-              remarkPlugins={[remarkGfm]}
-              rehypePlugins={[rehypeHighlight]}
-              components={{
-                code: ({ className, children, ...props }) => {
-                  const match = /language-(\w+)/.exec(className || '');
-                  const isInline = !match;
-                  return !isInline ? (
-                    <pre className="bg-gray-800 rounded p-3 overflow-x-auto">
-                      <code className={className} {...props}>
+          {/* Markdown Content or Loading Animation */}
+          {isLoading && !message ? (
+            <div className="flex items-center gap-2">
+              <div className="animate-pulse">Thinking...</div>
+              <div className="flex gap-1">
+                <div
+                  className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                  style={{ animationDelay: '0ms' }}
+                ></div>
+                <div
+                  className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                  style={{ animationDelay: '150ms' }}
+                ></div>
+                <div
+                  className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                  style={{ animationDelay: '300ms' }}
+                ></div>
+              </div>
+            </div>
+          ) : (
+            <div className="prose prose-invert prose-sm max-w-none">
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                rehypePlugins={[rehypeHighlight]}
+                components={{
+                  code: ({ className, children, ...props }) => {
+                    const match = /language-(\w+)/.exec(className || '');
+                    const isInline = !match;
+                    return !isInline ? (
+                      <pre className="bg-gray-800 rounded p-3 overflow-x-auto">
+                        <code className={className} {...props}>
+                          {children}
+                        </code>
+                      </pre>
+                    ) : (
+                      <code className="bg-gray-800 px-1 rounded text-sm" {...props}>
                         {children}
                       </code>
-                    </pre>
-                  ) : (
-                    <code className="bg-gray-800 px-1 rounded text-sm" {...props}>
+                    );
+                  },
+                  p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                  ul: ({ children }) => <ul className="list-disc list-inside mb-2">{children}</ul>,
+                  ol: ({ children }) => <ol className="list-decimal list-inside mb-2">{children}</ol>,
+                  li: ({ children }) => <li className="mb-1">{children}</li>,
+                  h1: ({ children }) => <h1 className="text-lg font-bold mb-2">{children}</h1>,
+                  h2: ({ children }) => <h2 className="text-base font-bold mb-2">{children}</h2>,
+                  h3: ({ children }) => <h3 className="text-sm font-bold mb-1">{children}</h3>,
+                  blockquote: ({ children }) => (
+                    <blockquote className="border-l-4 border-gray-500 pl-4 italic text-gray-300">
                       {children}
-                    </code>
-                  );
-                },
-                p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-                ul: ({ children }) => <ul className="list-disc list-inside mb-2">{children}</ul>,
-                ol: ({ children }) => <ol className="list-decimal list-inside mb-2">{children}</ol>,
-                li: ({ children }) => <li className="mb-1">{children}</li>,
-                h1: ({ children }) => <h1 className="text-lg font-bold mb-2">{children}</h1>,
-                h2: ({ children }) => <h2 className="text-base font-bold mb-2">{children}</h2>,
-                h3: ({ children }) => <h3 className="text-sm font-bold mb-1">{children}</h3>,
-                blockquote: ({ children }) => (
-                  <blockquote className="border-l-4 border-gray-500 pl-4 italic text-gray-300">
-                    {children}
-                  </blockquote>
-                ),
-                table: ({ children }) => (
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full border border-gray-600 rounded">
+                    </blockquote>
+                  ),
+                  table: ({ children }) => (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full border border-gray-600 rounded">
+                        {children}
+                      </table>
+                    </div>
+                  ),
+                  th: ({ children }) => (
+                    <th className="border border-gray-600 px-3 py-2 bg-gray-800 font-medium text-left">
                       {children}
-                    </table>
-                  </div>
-                ),
-                th: ({ children }) => (
-                  <th className="border border-gray-600 px-3 py-2 bg-gray-800 font-medium text-left">
-                    {children}
-                  </th>
-                ),
-                td: ({ children }) => (
-                  <td className="border border-gray-600 px-3 py-2">
-                    {children}
-                  </td>
-                ),
-              }}
-            >
-              {message || ''}
-            </ReactMarkdown>
-          </div>
+                    </th>
+                  ),
+                  td: ({ children }) => (
+                    <td className="border border-gray-600 px-3 py-2">
+                      {children}
+                    </td>
+                  ),
+                }}
+              >
+                {message || ''}
+              </ReactMarkdown>
+            </div>
+          )}
 
           {errorProvider && (
             <p className="text-xs text-red-300/70 mt-1">

@@ -153,6 +153,8 @@ export class APIKeyService {
 
       models.push({
         id: modelConfig.id,
+        name: modelConfig.name,
+        provider: modelConfig.provider,
         configured: status.configured,
         requiresUserKey: !status.configured,
         error: status.error,

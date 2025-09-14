@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ChatMessage } from './chat-message';
 import { ChatInput } from './chat-input';
@@ -80,22 +80,18 @@ function parseMessageContent(content: string): {
     }
   }
 
-  // Extract tools section first
-  const toolsSectionRegex = /<tools>([\s\S]*?)<\/tools>/gi;
+  // Extract tools section first - more aggressive removal
+  const toolsSectionRegex = /<tools>[\s\S]*?<\/tools>/gi;
   const toolsSectionMatch = content.match(toolsSectionRegex);
-  
-  console.log('🔧 [PARSING DEBUG] Tools section match:', toolsSectionMatch);
   
   if (toolsSectionMatch) {
     const toolsSection = toolsSectionMatch[0];
-    console.log('🔧 [PARSING DEBUG] Tools section content:', toolsSection);
     
-    // Extract individual tool calls from tools section - more flexible regex
+    // Extract individual tool calls from tools section
     const toolCallRegex = /<tool\s+name="([^"]+)"\s+args='([^']*)'\s+(?:result='([^']*)'\s+success="true"|error='([^']*)'\s+success="false")[^>]*><\/tool>/g;
     let toolMatch;
     
     while ((toolMatch = toolCallRegex.exec(toolsSection)) !== null) {
-      console.log('🔧 [PARSING DEBUG] Tool match:', toolMatch);
       const toolName = toolMatch[1];
       const argsString = toolMatch[2];
       const resultString = toolMatch[3];
@@ -119,8 +115,6 @@ function parseMessageContent(content: string): {
           result: result,
           success: !errorString,
         });
-        
-        console.log('🔧 [PARSING DEBUG] Added tool call:', { name: toolName, success: !errorString });
       } catch {
         // If JSON parsing fails, store as string
         toolCalls.push({
@@ -129,15 +123,16 @@ function parseMessageContent(content: string): {
           result: resultString || errorString,
           success: !errorString,
         });
-        
-        console.log('🔧 [PARSING DEBUG] Added tool call (fallback):', { name: toolName, success: !errorString });
       }
     }
     
-    // Remove tools section from main content
-    mainContent = mainContent.replace(toolsSectionRegex, '').trim();
-    console.log('🔧 [PARSING DEBUG] Main content after removing tools:', mainContent.substring(0, 100) + '...');
+    // Remove tools section from main content - use the exact match
+    mainContent = mainContent.replace(toolsSection, '').trim();
   }
+  
+  // Also remove any standalone tool tags that might not be in tools section
+  const standaloneToolRegex = /<tool\s+name="[^"]+"\s+args='[^']*'\s+(?:result='[^']*'\s+success="true"|error='[^']*'\s+success="false")[^>]*><\/tool>/g;
+  mainContent = mainContent.replace(standaloneToolRegex, '').trim();
 
   // Debug logging
   console.log('=== PARSING DEBUG ===');
@@ -169,6 +164,24 @@ export function ChatUIV5() {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedModel, setSelectedModel] = useState<string>(getDefaultModel());
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [modelStatus, setModelStatus] = useState<{
+    models: Array<{
+      id: string;
+      name: string;
+      provider: string;
+      configured: boolean;
+      error?: string;
+    }>;
+    hasAnyConfigured: boolean;
+    errors: Array<{
+      type: string;
+      message: string;
+      model?: string;
+      provider?: string;
+      timestamp?: string;
+    }>;
+  } | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Load selected model from localStorage on component mount
   useEffect(() => {
@@ -177,6 +190,37 @@ export function ChatUIV5() {
       setSelectedModel(savedModel);
     }
   }, []);
+
+  // Check model configuration status on component mount and page reload
+  useEffect(() => {
+    const checkModelStatus = async () => {
+      try {
+        const response = await fetch('/api/models/status');
+        const statusData = await response.json();
+        setModelStatus(statusData);
+        // Save status to localStorage for persistence across reloads
+        localStorage.setItem('modelConfigurationStatus', JSON.stringify(statusData));
+      } catch (error) {
+        console.error('Failed to check model status:', error);
+        // Try to load from localStorage if API call fails
+        const savedStatus = localStorage.getItem('modelConfigurationStatus');
+        if (savedStatus) {
+          try {
+            setModelStatus(JSON.parse(savedStatus));
+          } catch (parseError) {
+            console.error('Failed to parse saved model status:', parseError);
+          }
+        }
+      }
+    };
+
+    checkModelStatus();
+  }, []);
+
+  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, isLoading]);
 
   // Save selected model to localStorage when it changes
   const handleModelChange = (modelId: string) => {
@@ -228,7 +272,7 @@ export function ChatUIV5() {
       // Get user API keys to send with request
       const userApiKeys = APIKeyService.getUserAPIKeys();
 
-      // Use agent streaming directly
+      // Use non-streaming API
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: {
@@ -236,7 +280,7 @@ export function ChatUIV5() {
         },
         body: JSON.stringify({
           ...agentRequest,
-          stream: true,
+          stream: false, // Explicitly disable streaming
           userApiKeys, // Include user API keys in request
         }),
       }).catch(() => {
@@ -266,97 +310,59 @@ export function ChatUIV5() {
         throw error;
       }
 
-      if (!response.body) {
-        throw new Error('No response body');
+      const responseData = await response.json();
+
+      // Check for error in response
+      if (responseData.error) {
+        const error = new Error(responseData.error.message || 'API error occurred');
+        (
+          error as Error & { errorType: string; errorTimestamp: string }
+        ).errorType = responseData.error.type || 'unknown';
+        (
+          error as Error & { errorType: string; errorTimestamp: string }
+        ).errorTimestamp = responseData.error.timestamp;
+        throw error;
       }
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-
-          if (done) break;
-
-          const chunk = decoder.decode(value);
-          const lines = chunk.split('\n');
-
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              const data = line.slice(6).trim();
-
-              if (data === '[DONE]') {
-                setIsLoading(false);
-                return;
-              }
-
-              try {
-                const parsedChunk = JSON.parse(data);
-
-                // Check for error chunks
-                if (parsedChunk.error) {
-                  const error = new Error(
-                    parsedChunk.error.message || 'Streaming error occurred'
-                  );
-                  (
-                    error as Error & {
-                      errorType: string;
-                      errorTimestamp: string;
-                    }
-                  ).errorType = parsedChunk.error.type || 'unknown';
-                  (
-                    error as Error & {
-                      errorType: string;
-                      errorTimestamp: string;
-                    }
-                  ).errorTimestamp = parsedChunk.error.timestamp;
-                  throw error;
-                }
-
-                if (parsedChunk.choices && parsedChunk.choices.length > 0) {
-                  const choice = parsedChunk.choices[0];
-
-                  if (choice.delta.content) {
-                    const content = choice.delta.content;
-                    
-                    // Update the message with new content
-                    setMessages((prev) =>
-                      prev.map((msg) => {
-                        if (msg.id === aiMessageId) {
-                          const newText = msg.text + content;
-                          const { thinking, mainContent, toolCalls } = parseMessageContent(newText);
-                          
-                          return {
-                            ...msg,
-                            text: newText, // Keep the raw text for streaming
-                            mainContent: mainContent, // Store the processed main content
-                            thinking: thinking,
-                            toolCalls: toolCalls,
-                          };
-                        }
-                        return msg;
-                      })
-                    );
-                  }
-
-                  if (choice.finish_reason === 'stop') {
-                    setIsLoading(false);
-                  }
-                }
-              } catch (parseError) {
-                // If it's our thrown error from error chunk, re-throw it
-                if ((parseError as Error & { errorType?: string }).errorType) {
-                  throw parseError;
-                }
-                console.warn('Failed to parse chunk:', data);
-              }
-            }
-          }
+      // Extract the response content
+      if (responseData.choices && responseData.choices.length > 0) {
+        const message = responseData.choices[0].message;
+        const content = message.content;
+        
+        // Get thinking and tool calls directly from the response if available
+        const thinking = message.thinking;
+        const toolCalls = message.toolCalls || [];
+        
+        // If thinking and tool calls are not in the response, try to parse from content
+        let parsedThinking = thinking;
+        let parsedToolCalls = toolCalls;
+        let mainContent = content;
+        
+        if (!thinking && !toolCalls.length) {
+          const parsed = parseMessageContent(content);
+          parsedThinking = parsed.thinking;
+          parsedToolCalls = parsed.toolCalls;
+          mainContent = parsed.mainContent;
         }
-      } finally {
-        reader.releaseLock();
+        
+        // Update the AI message with the complete response
+        setMessages((prev) =>
+          prev.map((msg) => {
+            if (msg.id === aiMessageId) {
+              return {
+                ...msg,
+                text: content,
+                mainContent: mainContent,
+                thinking: parsedThinking,
+                toolCalls: parsedToolCalls,
+              };
+            }
+            return msg;
+          })
+        );
       }
+
+      setIsLoading(false);
     } catch (error) {
       console.error('Failed to send message:', error);
 
@@ -418,6 +424,7 @@ export function ChatUIV5() {
   };
 
   const handleSuggestedMessage = (messageText: string) => {
+    console.log('Suggested message clicked:', messageText);
     handleSendMessage(messageText);
   };
 
@@ -451,6 +458,19 @@ export function ChatUIV5() {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            {modelStatus && (
+              <div className="flex items-center gap-2 text-sm">
+                <div className={`w-2 h-2 rounded-full ${
+                  modelStatus.hasAnyConfigured ? 'bg-green-500' : 'bg-red-500'
+                }`}></div>
+                <span className="text-gray-300">
+                  {modelStatus.hasAnyConfigured 
+                    ? `${new Set(modelStatus.models.filter(m => m.configured).map(m => m.provider)).size} provider(s) configured`
+                    : 'No providers configured'
+                  }
+                </span>
+              </div>
+            )}
             <div className="flex items-center gap-2 text-sm text-gray-300">
               <span>Using:</span>
               <span className="font-medium text-white">
@@ -504,40 +524,10 @@ export function ChatUIV5() {
                 onRetry={message.isError ? handleRetry : undefined}
                 thinking={message.thinking}
                 toolCalls={message.toolCalls}
+                isLoading={isLoading && !message.isUser && message.id === messages[messages.length - 1]?.id}
               />
             ))}
-            {isLoading && (
-              <div className="flex gap-3 p-4">
-                <div className="relative">
-                  <Avatar className="h-8 w-8">
-                    <AvatarFallback className="bg-blue-600 text-white">
-                      AI
-                    </AvatarFallback>
-                  </Avatar>
-                  {/* Thinking animation next to avatar */}
-                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
-                </div>
-                <div className="bg-gray-700 text-gray-100 rounded-lg px-4 py-2">
-                  <div className="flex items-center gap-2">
-                    <div className="animate-pulse">Thinking...</div>
-                    <div className="flex gap-1">
-                      <div
-                        className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                        style={{ animationDelay: '0ms' }}
-                      ></div>
-                      <div
-                        className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                        style={{ animationDelay: '150ms' }}
-                      ></div>
-                      <div
-                        className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                        style={{ animationDelay: '300ms' }}
-                      ></div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
+            <div ref={messagesEndRef} />
           </div>
         )}
       </div>
