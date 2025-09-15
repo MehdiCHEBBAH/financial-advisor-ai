@@ -2,20 +2,118 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Import highlight.js theme */
-@import 'highlight.js/styles/github-dark.css';
+/* Import highlight.js theme for light mode */
+@import 'highlight.js/styles/github.css';
 
 @layer base {
   * {
-    @apply border-gray-700;
+    @apply border-gray-200;
   }
   body {
-    @apply bg-gray-900 text-gray-100;
+    @apply bg-gray-50 text-gray-900;
+  }
+  
+  /* Custom scrollbar for light theme */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    @apply bg-gray-100;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    @apply bg-gray-300 rounded-full;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-gray-400;
+  }
+}
+
+@layer components {
+  /* Enhanced button styles */
+  .btn-primary {
+    @apply bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg transition-colors duration-200 shadow-sm hover:shadow-md;
+  }
+  
+  .btn-secondary {
+    @apply bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium px-4 py-2 rounded-lg transition-colors duration-200 border border-gray-300;
+  }
+  
+  .btn-outline {
+    @apply border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium px-4 py-2 rounded-lg transition-colors duration-200;
+  }
+  
+  /* Card styles */
+  .card {
+    @apply bg-white rounded-xl shadow-sm border border-gray-200 p-6;
+  }
+  
+  .card-hover {
+    @apply card hover:shadow-md transition-shadow duration-200;
+  }
+  
+  /* Input styles */
+  .input-field {
+    @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200 bg-white;
+  }
+  
+  /* Chat message styles */
+  .message-user {
+    @apply bg-blue-600 text-white rounded-2xl rounded-br-md px-4 py-3 max-w-xs ml-auto;
+  }
+  
+  .message-ai {
+    @apply bg-white text-gray-900 rounded-2xl rounded-bl-md px-4 py-3 max-w-2xl border border-gray-200 shadow-sm;
+  }
+  
+  /* Status indicators */
+  .status-success {
+    @apply text-green-600 bg-green-50 border-green-200;
+  }
+  
+  .status-error {
+    @apply text-red-600 bg-red-50 border-red-200;
+  }
+  
+  .status-warning {
+    @apply text-yellow-600 bg-yellow-50 border-yellow-200;
+  }
+  
+  .status-info {
+    @apply text-blue-600 bg-blue-50 border-blue-200;
   }
 }
 
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+  
+  .glass-effect {
+    @apply bg-white/80 backdrop-blur-sm border border-white/20;
+  }
+  
+  .gradient-bg {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  }
+  
+  /* Mobile-specific improvements */
+  @media (max-width: 640px) {
+    .mobile-safe-area {
+      padding-left: env(safe-area-inset-left);
+      padding-right: env(safe-area-inset-right);
+    }
+    
+    .mobile-touch-target {
+      min-height: 44px;
+      min-width: 44px;
+    }
+    
+    .mobile-scroll {
+      -webkit-overflow-scrolling: touch;
+    }
   }
 }

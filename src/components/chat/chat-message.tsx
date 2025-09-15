@@ -17,12 +17,12 @@ interface ToolCall {
 
 function getMessageClassName(isUser: boolean, isError: boolean): string {
   if (isUser) {
-    return 'bg-blue-600 text-white';
+    return 'message-user';
   }
   if (isError) {
-    return 'bg-red-900/20 border border-red-500/30 text-red-200';
+    return 'status-error border rounded-xl px-4 py-3';
   }
-  return 'bg-gray-700 text-gray-100';
+  return 'message-ai';
 }
 
 interface ChatMessageProps {
@@ -59,8 +59,8 @@ export function ChatMessage({
       {!isUser && (
         <div className="relative">
           <Avatar className="h-8 w-8">
-            <AvatarImage src="/ai-avatar.svg" alt="AI" />
-            <AvatarFallback className="bg-blue-600 text-white">AI</AvatarFallback>
+            <AvatarImage src="/ai-avatar-simple.svg" alt="Financial Adviser AI" />
+            <AvatarFallback className="bg-gradient-to-br from-blue-600 to-blue-700 text-white font-semibold">FA</AvatarFallback>
           </Avatar>
           {/* Thinking animation next to avatar */}
           {(thinking && !isThinkingExpanded) || isLoading ? (
@@ -72,10 +72,10 @@ export function ChatMessage({
       <div className="max-w-[80%] space-y-2">
         {/* Thinking Block */}
         {thinking && !isUser && (
-          <div className="bg-gray-800/50 border border-gray-600 rounded-lg p-3">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
             <button
               onClick={() => setIsThinkingExpanded(!isThinkingExpanded)}
-              className="flex items-center gap-2 w-full text-left text-xs text-gray-400 hover:text-gray-300 transition-colors"
+              className="flex items-center gap-2 w-full text-left text-xs text-blue-600 hover:text-blue-700 transition-colors"
             >
               {isThinkingExpanded ? (
                 <ChevronDown className="h-3 w-3" />
@@ -85,7 +85,7 @@ export function ChatMessage({
               <span className="font-medium">Thinking Process</span>
             </button>
             {isThinkingExpanded && (
-              <div className="mt-2 text-xs text-gray-300 whitespace-pre-wrap">
+              <div className="mt-2 text-xs text-gray-700 whitespace-pre-wrap">
                 {thinking}
               </div>
             )}
@@ -94,10 +94,10 @@ export function ChatMessage({
 
         {/* Tool Calls */}
         {toolCalls.length > 0 && !isUser && (
-          <div className="bg-gray-800/50 border border-gray-600 rounded-lg p-3">
+          <div className="bg-green-50 border border-green-200 rounded-lg p-3">
             <button
               onClick={() => setIsToolCallsExpanded(!isToolCallsExpanded)}
-              className="flex items-center gap-2 w-full text-left text-xs text-gray-400 hover:text-gray-300 transition-colors"
+              className="flex items-center gap-2 w-full text-left text-xs text-green-600 hover:text-green-700 transition-colors"
             >
               {isToolCallsExpanded ? (
                 <ChevronDown className="h-3 w-3" />
@@ -112,36 +112,36 @@ export function ChatMessage({
                 {toolCalls.map((toolCall, index) => (
                   <div
                     key={`${toolCall.name}-${index}`}
-                    className="bg-gray-700/50 rounded p-2 text-xs"
+                    className="bg-white rounded p-3 text-xs border border-green-200"
                   >
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="font-medium text-blue-400">
+                      <span className="font-medium text-blue-600">
                         {toolCall.name}
                       </span>
                       <span
                         className={cn(
                           'px-1.5 py-0.5 rounded text-xs',
                           toolCall.success
-                            ? 'bg-green-900/30 text-green-400'
-                            : 'bg-red-900/30 text-red-400'
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-red-100 text-red-700'
                         )}
                       >
                         {toolCall.success ? 'Success' : 'Failed'}
                       </span>
                     </div>
                     {Object.keys(toolCall.args).length > 0 && (
-                      <div className="text-gray-400">
+                      <div className="text-gray-600">
                         <span className="font-medium">Args:</span>{' '}
-                        <code className="bg-gray-800 px-1 rounded">
+                        <code className="bg-gray-100 px-1 rounded text-gray-800">
                           {JSON.stringify(toolCall.args, null, 2)}
                         </code>
                       </div>
                     )}
                     {toolCall.result != null && (
-                      <div className="text-gray-400 mt-1">
+                      <div className="text-gray-600 mt-1">
                         <span className="font-medium">Result:</span>{' '}
-                        <div className="bg-gray-800 px-2 py-1 rounded mt-1 max-h-32 overflow-y-auto">
-                          <pre className="text-xs whitespace-pre-wrap">
+                        <div className="bg-gray-100 px-2 py-1 rounded mt-1 max-h-32 overflow-y-auto">
+                          <pre className="text-xs whitespace-pre-wrap text-gray-800">
                             {typeof toolCall.result === 'string' 
                               ? toolCall.result 
                               : JSON.stringify(toolCall.result, null, 2)
@@ -198,7 +198,7 @@ export function ChatMessage({
               </div>
             </div>
           ) : (
-            <div className="prose prose-invert prose-sm max-w-none">
+            <div className="prose prose-sm max-w-none">
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
                 rehypePlugins={[rehypeHighlight]}
@@ -207,45 +207,72 @@ export function ChatMessage({
                     const match = /language-(\w+)/.exec(className || '');
                     const isInline = !match;
                     return !isInline ? (
-                      <pre className="bg-gray-800 rounded p-3 overflow-x-auto">
-                        <code className={className} {...props}>
-                          {children}
-                        </code>
-                      </pre>
+                      <div className="my-3">
+                        <pre className="bg-gray-900 rounded-lg p-4 overflow-x-auto border border-gray-700">
+                          <code className={className} {...props}>
+                            {children}
+                          </code>
+                        </pre>
+                      </div>
                     ) : (
-                      <code className="bg-gray-800 px-1 rounded text-sm" {...props}>
+                      <code className="bg-gray-100 text-gray-800 px-1.5 py-0.5 rounded text-sm font-mono border" {...props}>
                         {children}
                       </code>
                     );
                   },
-                  p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-                  ul: ({ children }) => <ul className="list-disc list-inside mb-2">{children}</ul>,
-                  ol: ({ children }) => <ol className="list-decimal list-inside mb-2">{children}</ol>,
-                  li: ({ children }) => <li className="mb-1">{children}</li>,
-                  h1: ({ children }) => <h1 className="text-lg font-bold mb-2">{children}</h1>,
-                  h2: ({ children }) => <h2 className="text-base font-bold mb-2">{children}</h2>,
-                  h3: ({ children }) => <h3 className="text-sm font-bold mb-1">{children}</h3>,
+                  p: ({ children }) => <p className="mb-3 last:mb-0 leading-relaxed">{children}</p>,
+                  // Ensure proper list spacing and nested list styling
+                  ul: ({ children }) => (
+                    <ul className="mb-3 space-y-1 pl-5 marker:text-gray-600 list-disc">
+                      {children}
+                    </ul>
+                  ),
+                  ol: ({ children }) => (
+                    <ol className="mb-3 space-y-1 pl-5 list-decimal marker:text-gray-600">
+                      {children}
+                    </ol>
+                  ),
+                  li: ({ children }) => (
+                    <li className="leading-relaxed [&_ul]:mt-1 [&_ol]:mt-1">
+                      {children}
+                    </li>
+                  ),
+                  h1: ({ children }) => <h1 className="text-xl font-bold mb-3 mt-4 first:mt-0 text-gray-900 border-b border-gray-200 pb-2">{children}</h1>,
+                  h2: ({ children }) => <h2 className="text-lg font-bold mb-2 mt-3 first:mt-0 text-gray-900">{children}</h2>,
+                  h3: ({ children }) => <h3 className="text-base font-bold mb-2 mt-3 first:mt-0 text-gray-900">{children}</h3>,
+                  h4: ({ children }) => <h4 className="text-sm font-bold mb-1 mt-2 first:mt-0 text-gray-900">{children}</h4>,
                   blockquote: ({ children }) => (
-                    <blockquote className="border-l-4 border-gray-500 pl-4 italic text-gray-300">
+                    <blockquote className="border-l-4 border-blue-500 pl-4 italic text-gray-700 bg-blue-50 py-2 rounded-r-lg my-3">
                       {children}
                     </blockquote>
                   ),
                   table: ({ children }) => (
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full border border-gray-600 rounded">
+                    <div className="overflow-x-auto my-4">
+                      <table className="min-w-full border border-gray-300 rounded-lg overflow-hidden">
                         {children}
                       </table>
                     </div>
                   ),
                   th: ({ children }) => (
-                    <th className="border border-gray-600 px-3 py-2 bg-gray-800 font-medium text-left">
+                    <th className="border border-gray-300 px-4 py-3 bg-gray-100 font-semibold text-left text-gray-900">
                       {children}
                     </th>
                   ),
                   td: ({ children }) => (
-                    <td className="border border-gray-600 px-3 py-2">
+                    <td className="border border-gray-300 px-4 py-3 text-gray-700">
                       {children}
                     </td>
+                  ),
+                  a: ({ children, href }) => (
+                    <a href={href} className="text-blue-600 hover:text-blue-800 underline decoration-blue-300 hover:decoration-blue-500 transition-colors" target="_blank" rel="noopener noreferrer">
+                      {children}
+                    </a>
+                  ),
+                  strong: ({ children }) => <strong className="font-semibold text-gray-900">{children}</strong>,
+                  em: ({ children }) => <em className="italic text-gray-700">{children}</em>,
+                  hr: () => <hr className="my-4 border-gray-300" />,
+                  img: ({ src, alt }) => (
+                    <img src={src} alt={alt} className="max-w-full h-auto rounded-lg shadow-sm my-3" />
                   ),
                 }}
               >

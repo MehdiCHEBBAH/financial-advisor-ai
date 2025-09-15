@@ -5,8 +5,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ChatMessage } from './chat-message';
 import { ChatInput } from './chat-input';
 import { SuggestedMessages } from './suggested-messages';
-import { SettingsPopup } from './settings-popup';
-import { Bot, Settings } from 'lucide-react';
+import { EnhancedSettingsPopup } from './enhanced-settings-popup';
+import { Settings } from 'lucide-react';
 import { getDefaultModel, getModelConfig } from '@/lib/agent';
 import { APIKeyService } from '@/lib/services';
 import { Button } from '@/components/ui/button';
@@ -183,6 +183,43 @@ export function ChatUIV5() {
   } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Function to refresh model status (called from settings popup)
+  const refreshModelStatus = async () => {
+    try {
+      const response = await fetch('/api/models/status');
+      const statusData = await response.json();
+      
+      // Get user API keys to determine which providers are user-configured
+      const userKeys = APIKeyService.getUserAPIKeys();
+      
+      // Update the status to include user-configured providers
+      const updatedModels = statusData.models.map((model: {
+        id: string;
+        name: string;
+        provider: string;
+        configured: boolean;
+        error?: string;
+      }) => {
+        const hasUserKey = !!userKeys[model.provider as keyof typeof userKeys];
+        return {
+          ...model,
+          configured: model.configured || hasUserKey
+        };
+      });
+      
+      const updatedStatus = {
+        ...statusData,
+        models: updatedModels,
+        hasAnyConfigured: updatedModels.some((m: { configured: boolean }) => m.configured)
+      };
+      
+      setModelStatus(updatedStatus);
+      localStorage.setItem('modelConfigurationStatus', JSON.stringify(updatedStatus));
+    } catch (error) {
+      console.error('Failed to refresh model status:', error);
+    }
+  };
+
   // Load selected model from localStorage on component mount
   useEffect(() => {
     const savedModel = localStorage.getItem('selectedModel');
@@ -197,9 +234,34 @@ export function ChatUIV5() {
       try {
         const response = await fetch('/api/models/status');
         const statusData = await response.json();
-        setModelStatus(statusData);
+        
+        // Get user API keys to determine which providers are user-configured
+        const userKeys = APIKeyService.getUserAPIKeys();
+        
+        // Update the status to include user-configured providers
+        const updatedModels = statusData.models.map((model: {
+          id: string;
+          name: string;
+          provider: string;
+          configured: boolean;
+          error?: string;
+        }) => {
+          const hasUserKey = !!userKeys[model.provider as keyof typeof userKeys];
+          return {
+            ...model,
+            configured: model.configured || hasUserKey
+          };
+        });
+        
+        const updatedStatus = {
+          ...statusData,
+          models: updatedModels,
+          hasAnyConfigured: updatedModels.some((m: { configured: boolean }) => m.configured)
+        };
+        
+        setModelStatus(updatedStatus);
         // Save status to localStorage for persistence across reloads
-        localStorage.setItem('modelConfigurationStatus', JSON.stringify(statusData));
+        localStorage.setItem('modelConfigurationStatus', JSON.stringify(updatedStatus));
       } catch (error) {
         console.error('Failed to check model status:', error);
         // Try to load from localStorage if API call fails
@@ -439,31 +501,33 @@ export function ChatUIV5() {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-gray-900">
+    <div className="flex flex-col h-screen bg-gradient-to-br from-blue-50 to-indigo-100 mobile-safe-area">
       {/* Header */}
-      <div className="border-b border-gray-700 p-4">
-        <div className="flex items-center justify-between">
+      <div className="bg-white/80 backdrop-blur-sm border-b border-gray-200 p-3 sm:p-4 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="flex items-center gap-3">
-            <Avatar className="h-10 w-10">
-              <AvatarImage src="/ai-avatar.svg" alt="Financial Adviser AI" />
-              <AvatarFallback className="bg-blue-600 text-white">
-                <Bot className="h-5 w-5" />
+            <Avatar className="h-10 w-10 sm:h-12 sm:w-12 ring-2 ring-blue-100">
+              <AvatarImage src="/ai-avatar-simple.svg" alt="Financial Adviser AI" />
+              <AvatarFallback className="bg-gradient-to-br from-blue-600 to-blue-700 text-white font-semibold">
+                FA
               </AvatarFallback>
             </Avatar>
             <div>
-              <h1 className="text-lg font-semibold">Financial Adviser AI</h1>
-              <p className="text-sm text-gray-400">
+              <h1 className="text-lg sm:text-xl font-bold text-gray-900">Financial Adviser AI</h1>
+              <p className="text-xs sm:text-sm text-gray-600">
                 Your intelligent investment advisor
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          
+          {/* Mobile: Stack status info vertically, Desktop: Horizontal */}
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
             {modelStatus && (
-              <div className="flex items-center gap-2 text-sm">
+              <div className="flex items-center gap-2 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg bg-gray-50 border border-gray-200">
                 <div className={`w-2 h-2 rounded-full ${
                   modelStatus.hasAnyConfigured ? 'bg-green-500' : 'bg-red-500'
                 }`}></div>
-                <span className="text-gray-300">
+                <span className="text-xs sm:text-sm text-gray-700">
                   {modelStatus.hasAnyConfigured 
                     ? `${new Set(modelStatus.models.filter(m => m.configured).map(m => m.provider)).size} provider(s) configured`
                     : 'No providers configured'
@@ -471,9 +535,9 @@ export function ChatUIV5() {
                 </span>
               </div>
             )}
-            <div className="flex items-center gap-2 text-sm text-gray-300">
-              <span>Using:</span>
-              <span className="font-medium text-white">
+            <div className="flex items-center gap-2 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg bg-blue-50 border border-blue-200">
+              <span className="text-xs sm:text-sm text-gray-600">Using:</span>
+              <span className="text-xs sm:text-sm font-semibold text-blue-900 truncate max-w-[120px] sm:max-w-none">
                 {getModelConfig(selectedModel)?.name || selectedModel}
               </span>
             </div>
@@ -481,37 +545,40 @@ export function ChatUIV5() {
               variant="outline"
               size="sm"
               onClick={() => setIsSettingsOpen(true)}
-              className="border-gray-600 text-gray-300 hover:bg-gray-800"
+              className="btn-outline text-xs sm:text-sm"
             >
-              <Settings className="h-4 w-4 mr-2" />
-              Settings
+              <Settings className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">Settings</span>
+              <span className="sm:hidden">Config</span>
             </Button>
           </div>
         </div>
       </div>
 
       {/* Chat Messages */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto p-2 sm:p-4 mobile-scroll">
         {messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full p-6">
-            <Avatar className="h-20 w-20 mb-6">
-              <AvatarImage src="/ai-avatar.svg" alt="Financial Adviser AI" />
-              <AvatarFallback className="bg-blue-600 text-white text-2xl">
-                <Bot className="h-10 w-10" />
-              </AvatarFallback>
-            </Avatar>
-            <h2 className="text-2xl font-bold mb-2">
-              Welcome to Financial Adviser AI
-            </h2>
-            <p className="text-gray-400 text-center max-w-md mb-8">
-              Get AI-powered investment advice for any stock of your choice. Our
-              intelligent adviser analyzes market data to help you make informed
-              investment decisions.
-            </p>
-            <SuggestedMessages onMessageSelect={handleSuggestedMessage} />
+          <div className="flex flex-col items-center justify-center h-full p-4 sm:p-6">
+            <div className="card max-w-2xl text-center w-full">
+              <Avatar className="h-16 w-16 sm:h-24 sm:w-24 mb-4 sm:mb-6 mx-auto ring-4 ring-blue-100">
+                <AvatarImage src="/ai-avatar-simple.svg" alt="Financial Adviser AI" />
+                <AvatarFallback className="bg-gradient-to-br from-blue-600 to-blue-700 text-white text-2xl sm:text-3xl font-semibold">
+                  FA
+                </AvatarFallback>
+              </Avatar>
+              <h2 className="text-2xl sm:text-3xl font-bold mb-3 sm:mb-4 text-gray-900">
+                Welcome to Financial Adviser AI
+              </h2>
+              <p className="text-gray-600 text-base sm:text-lg mb-6 sm:mb-8 leading-relaxed px-2">
+                Get AI-powered investment advice for any stock of your choice. Our
+                intelligent adviser analyzes market data to help you make informed
+                investment decisions.
+              </p>
+              <SuggestedMessages onMessageSelect={handleSuggestedMessage} />
+            </div>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6">
             {messages.map((message) => (
               <ChatMessage
                 key={message.id}
@@ -541,12 +608,13 @@ export function ChatUIV5() {
         modelError={undefined}
       />
 
-      {/* Settings Popup */}
-      <SettingsPopup
+      {/* Enhanced Settings Popup */}
+      <EnhancedSettingsPopup
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
         selectedModel={selectedModel}
         onModelChange={handleModelChange}
+        onStatusChange={refreshModelStatus}
       />
     </div>
   );
