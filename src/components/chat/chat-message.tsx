@@ -300,6 +300,7 @@ export function ChatMessage({
                   strong: ({ children }) => <strong className="font-semibold text-gray-900">{children}</strong>,
                   em: ({ children }) => <em className="italic text-gray-700">{children}</em>,
                   hr: () => <hr className="my-4 border-gray-300" />,
+                  // eslint-disable-next-line @next/next/no-img-element
                   img: ({ src, alt }) => (
                     <img src={src} alt={alt} className="max-w-full h-auto rounded-lg shadow-sm my-3" />
                   ),

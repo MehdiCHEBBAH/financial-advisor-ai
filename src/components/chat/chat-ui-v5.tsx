@@ -51,8 +51,8 @@ function loadMessagesFromStorage(): Message[] {
     const stored = localStorage.getItem(CONVERSATION_STORAGE_KEY);
     if (!stored) return [];
     
-    const parsedMessages = JSON.parse(stored);
-    return parsedMessages.map((msg: any) => ({
+    const parsedMessages = JSON.parse(stored) as Array<Omit<Message, 'timestamp'> & { timestamp: string }>;
+    return parsedMessages.map((msg) => ({
       ...msg,
       timestamp: new Date(msg.timestamp)
     }));
