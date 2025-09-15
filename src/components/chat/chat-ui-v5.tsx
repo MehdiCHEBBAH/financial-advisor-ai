@@ -6,7 +6,7 @@ import { ChatMessage } from './chat-message';
 import { ChatInput } from './chat-input';
 import { SuggestedMessages } from './suggested-messages';
 import { EnhancedSettingsPopup } from './enhanced-settings-popup';
-import { Settings } from 'lucide-react';
+import { Settings, TrendingUp, BarChart3, PieChart } from 'lucide-react';
 import { getDefaultModel, getModelConfig } from '@/lib/agent';
 import { APIKeyService } from '@/lib/services';
 import { Button } from '@/components/ui/button';
@@ -558,22 +558,56 @@ export function ChatUIV5() {
       {/* Chat Messages */}
       <div className="flex-1 overflow-y-auto p-2 sm:p-4 mobile-scroll">
         {messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full p-4 sm:p-6">
-            <div className="card max-w-2xl text-center w-full">
-              <Avatar className="h-16 w-16 sm:h-24 sm:w-24 mb-4 sm:mb-6 mx-auto ring-4 ring-blue-100">
-                <AvatarImage src="/ai-avatar-simple.svg" alt="Financial Adviser AI" />
-                <AvatarFallback className="bg-gradient-to-br from-blue-600 to-blue-700 text-white text-2xl sm:text-3xl font-semibold">
-                  FA
-                </AvatarFallback>
-              </Avatar>
-              <h2 className="text-2xl sm:text-3xl font-bold mb-3 sm:mb-4 text-gray-900">
-                Welcome to Financial Adviser AI
-              </h2>
-              <p className="text-gray-600 text-base sm:text-lg mb-6 sm:mb-8 leading-relaxed px-2">
-                Get AI-powered investment advice for any stock of your choice. Our
-                intelligent adviser analyzes market data to help you make informed
-                investment decisions.
-              </p>
+          <div className="flex flex-col items-center justify-center h-full p-4 sm:p-6 min-h-[600px]">
+            {/* Hero Section */}
+            <div className="max-w-4xl w-full text-center mb-8 animate-fade-in-up">
+              <div className="relative inline-block mb-6 animate-fade-in-scale" style={{ animationDelay: '0.2s' }}>
+                <Avatar className="h-20 w-20 sm:h-28 sm:w-28 mx-auto ring-4 ring-blue-100/50 shadow-lg hover:shadow-xl transition-shadow duration-300">
+                  <AvatarImage src="/ai-avatar-simple.svg" alt="Financial Adviser AI" />
+                  <AvatarFallback className="bg-gradient-to-br from-blue-600 to-blue-700 text-white text-2xl sm:text-3xl font-semibold">
+                    FA
+                  </AvatarFallback>
+                </Avatar>
+                <div className="absolute -top-2 -right-2 w-6 h-6 bg-green-500 rounded-full border-2 border-white animate-pulse"></div>
+              </div>
+              
+              <div className="space-y-4" style={{ animationDelay: '0.4s' }}>
+                <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-gray-900 via-blue-900 to-gray-900 bg-clip-text text-transparent leading-tight animate-fade-in-up">
+                  Financial Adviser AI
+                </h1>
+                <p className="text-lg sm:text-xl text-gray-600 max-w-2xl mx-auto leading-relaxed animate-fade-in-up" style={{ animationDelay: '0.6s' }}>
+                  Your intelligent investment companion powered by advanced AI
+                </p>
+              </div>
+            </div>
+
+            {/* Features Section */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8 max-w-3xl w-full animate-fade-in-up" style={{ animationDelay: '0.8s' }}>
+              <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-4 border border-gray-200/50 hover:border-blue-300/50 transition-all duration-300 hover:shadow-lg hover:scale-105 group">
+                <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center mx-auto mb-3 group-hover:bg-blue-200 transition-colors duration-300">
+                  <TrendingUp className="h-6 w-6 text-blue-600" />
+                </div>
+                <h3 className="font-semibold text-gray-900 mb-2">Market Analysis</h3>
+                <p className="text-sm text-gray-600">Real-time insights and trend analysis</p>
+              </div>
+              <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-4 border border-gray-200/50 hover:border-green-300/50 transition-all duration-300 hover:shadow-lg hover:scale-105 group">
+                <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center mx-auto mb-3 group-hover:bg-green-200 transition-colors duration-300">
+                  <BarChart3 className="h-6 w-6 text-green-600" />
+                </div>
+                <h3 className="font-semibold text-gray-900 mb-2">Portfolio Advice</h3>
+                <p className="text-sm text-gray-600">Personalized investment strategies</p>
+              </div>
+              <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-4 border border-gray-200/50 hover:border-purple-300/50 transition-all duration-300 hover:shadow-lg hover:scale-105 group">
+                <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center mx-auto mb-3 group-hover:bg-purple-200 transition-colors duration-300">
+                  <PieChart className="h-6 w-6 text-purple-600" />
+                </div>
+                <h3 className="font-semibold text-gray-900 mb-2">Risk Assessment</h3>
+                <p className="text-sm text-gray-600">Comprehensive risk evaluation</p>
+              </div>
+            </div>
+
+            {/* Suggested Messages Section */}
+            <div className="w-full max-w-2xl animate-fade-in-up" style={{ animationDelay: '1s' }}>
               <SuggestedMessages onMessageSelect={handleSuggestedMessage} />
             </div>
           </div>
