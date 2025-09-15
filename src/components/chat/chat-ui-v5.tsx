@@ -6,7 +6,7 @@ import { ChatMessage } from './chat-message';
 import { ChatInput } from './chat-input';
 import { SuggestedMessages } from './suggested-messages';
 import { EnhancedSettingsPopup } from './enhanced-settings-popup';
-import { Settings, TrendingUp, BarChart3, PieChart } from 'lucide-react';
+import { Settings, TrendingUp, BarChart3, PieChart, RotateCcw } from 'lucide-react';
 import { getDefaultModel, getModelConfig } from '@/lib/agent';
 import { APIKeyService } from '@/lib/services';
 import { Button } from '@/components/ui/button';
@@ -29,6 +29,45 @@ interface ToolCall {
   args: Record<string, unknown>;
   result?: unknown;
   success?: boolean;
+}
+
+// localStorage utility functions
+const CONVERSATION_STORAGE_KEY = 'financial-adviser-conversation';
+
+function saveMessagesToStorage(messages: Message[]): void {
+  try {
+    const messagesToSave = messages.map(msg => ({
+      ...msg,
+      timestamp: msg.timestamp.toISOString()
+    }));
+    localStorage.setItem(CONVERSATION_STORAGE_KEY, JSON.stringify(messagesToSave));
+  } catch (error) {
+    console.warn('Failed to save messages to localStorage:', error);
+  }
+}
+
+function loadMessagesFromStorage(): Message[] {
+  try {
+    const stored = localStorage.getItem(CONVERSATION_STORAGE_KEY);
+    if (!stored) return [];
+    
+    const parsedMessages = JSON.parse(stored);
+    return parsedMessages.map((msg: any) => ({
+      ...msg,
+      timestamp: new Date(msg.timestamp)
+    }));
+  } catch (error) {
+    console.warn('Failed to load messages from localStorage:', error);
+    return [];
+  }
+}
+
+function clearMessagesFromStorage(): void {
+  try {
+    localStorage.removeItem(CONVERSATION_STORAGE_KEY);
+  } catch (error) {
+    console.warn('Failed to clear messages from localStorage:', error);
+  }
 }
 
 // Function to parse message content for thinking blocks and tool calls
@@ -164,6 +203,7 @@ export function ChatUIV5() {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedModel, setSelectedModel] = useState<string>(getDefaultModel());
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
   const [modelStatus, setModelStatus] = useState<{
     models: Array<{
       id: string;
@@ -283,6 +323,21 @@ export function ChatUIV5() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);
+
+  // Load conversation history from localStorage on component mount
+  useEffect(() => {
+    const savedMessages = loadMessagesFromStorage();
+    if (savedMessages.length > 0) {
+      setMessages(savedMessages);
+    }
+  }, []);
+
+  // Save messages to localStorage whenever they change
+  useEffect(() => {
+    if (messages.length > 0) {
+      saveMessagesToStorage(messages);
+    }
+  }, [messages]);
 
   // Save selected model to localStorage when it changes
   const handleModelChange = (modelId: string) => {
@@ -500,6 +555,22 @@ export function ChatUIV5() {
     }
   };
 
+  const handleResetConversation = async () => {
+    setIsResetting(true);
+    
+    // Add a flash effect by temporarily showing the reset state
+    await new Promise(resolve => setTimeout(resolve, 300));
+    
+    // Clear messages and localStorage
+    setMessages([]);
+    clearMessagesFromStorage();
+    
+    // Reset the flash state
+    setTimeout(() => {
+      setIsResetting(false);
+    }, 200);
+  };
+
   return (
     <div className="flex flex-col h-screen bg-gradient-to-br from-blue-50 to-indigo-100 mobile-safe-area">
       {/* Header */}
@@ -512,8 +583,24 @@ export function ChatUIV5() {
                 FA
               </AvatarFallback>
             </Avatar>
-            <div>
-              <h1 className="text-lg sm:text-xl font-bold text-gray-900">Financial Adviser AI</h1>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <h1 className="text-lg sm:text-xl font-bold text-gray-900">Financial Adviser AI</h1>
+                {messages.length > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleResetConversation}
+                    disabled={isResetting}
+                    className={`p-1 h-6 w-6 text-gray-400 hover:text-red-600 hover:bg-red-50 transition-all duration-200 ${
+                      isResetting ? 'text-red-600 bg-red-50' : ''
+                    }`}
+                    title="Start a new conversation - This will clear your current chat history"
+                  >
+                    <RotateCcw className={`h-3 w-3 ${isResetting ? 'animate-spin' : ''}`} />
+                  </Button>
+                )}
+              </div>
               <p className="text-xs sm:text-sm text-gray-600">
                 Your intelligent investment advisor
               </p>
@@ -556,7 +643,9 @@ export function ChatUIV5() {
       </div>
 
       {/* Chat Messages */}
-      <div className="flex-1 overflow-y-auto p-2 sm:p-4 mobile-scroll">
+      <div className={`flex-1 overflow-y-auto p-2 sm:p-4 mobile-scroll transition-all duration-300 ${
+        isResetting ? 'bg-white/50' : ''
+      }`}>
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full p-4 sm:p-6 min-h-[600px]">
             {/* Hero Section */}

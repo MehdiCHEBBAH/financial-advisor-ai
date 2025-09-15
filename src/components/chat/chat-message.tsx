@@ -52,6 +52,34 @@ export function ChatMessage({
 }: ChatMessageProps) {
   const [isThinkingExpanded, setIsThinkingExpanded] = useState(false);
   const [isToolCallsExpanded, setIsToolCallsExpanded] = useState(false);
+
+  // Clean message content to prevent unwanted Markdown list conversion
+  const cleanMessage = (content: string): string => {
+    if (!content) return content;
+    
+    // Simple approach: if content starts with common list markers but is a single line,
+    // escape the marker to prevent Markdown interpretation
+    const trimmedContent = content.trim();
+    
+    // Check for single-line content that starts with list markers
+    if (trimmedContent && !content.includes('\n')) {
+      // Escape dash, asterisk, plus, or numbered list markers at the start
+      if (/^- /.test(trimmedContent)) {
+        return content.replace(/^- /, '\\- ');
+      }
+      if (/^\* /.test(trimmedContent)) {
+        return content.replace(/^\* /, '\\* ');
+      }
+      if (/^\+ /.test(trimmedContent)) {
+        return content.replace(/^\+ /, '\\+ ');
+      }
+      if (/^\d+\. /.test(trimmedContent)) {
+        return content.replace(/^(\d+)\. /, '\\$1. ');
+      }
+    }
+    
+    return content;
+  };
   return (
     <div
       className={cn('flex gap-3 p-4', isUser ? 'justify-end' : 'justify-start')}
@@ -202,6 +230,7 @@ export function ChatMessage({
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
                 rehypePlugins={[rehypeHighlight]}
+                skipHtml={false}
                 components={{
                   code: ({ className, children, ...props }) => {
                     const match = /language-(\w+)/.exec(className || '');
@@ -276,7 +305,7 @@ export function ChatMessage({
                   ),
                 }}
               >
-                {message || ''}
+                {cleanMessage(message || '')}
               </ReactMarkdown>
             </div>
           )}
