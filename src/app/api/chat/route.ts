@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { FinancialAgent, validateModel } from '@/lib/agent';
 import { AgentMessage } from '@/lib/agent/types';
+import { LangSmithTracer } from '@/lib/agent/langsmith-tracer';
 
 // OpenAI Chat Completions API format for backward compatibility
 interface OpenAIMessage {
@@ -170,12 +171,21 @@ async function createAgentNonStreamingResponse(
     // Initialize agent
     const agent = new FinancialAgent();
     
-    const response = await agent.processMessage({
-      messages: uiMessages,
-      model,
-      temperature,
-      maxOutputTokens: maxTokens,
-    });
+    // Get the user message for tracing
+    const userMessage = uiMessages.find(msg => msg.role === 'user')?.content || 'Unknown user message';
+    const sessionId = `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Trace the agent run
+    const response = await LangSmithTracer.traceAgentRun(
+      sessionId,
+      userMessage,
+      () => agent.processMessage({
+        messages: uiMessages,
+        model,
+        temperature,
+        maxOutputTokens: maxTokens,
+      })
+    );
 
     // Convert back to OpenAI format for backward compatibility
     const openAIResponse = {

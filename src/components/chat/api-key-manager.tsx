@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { APIKeyService, UserAPIKeys } from '@/lib/services';
@@ -27,17 +27,12 @@ export function APIKeyManager({ onStatusChange }: APIKeyManagerProps) {
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
   const [isLoading, setIsLoading] = useState(false);
 
-  useEffect(() => {
-    loadUserKeys();
-    checkModelStatus();
-  }, []);
-
   const loadUserKeys = () => {
     const keys = APIKeyService.getUserAPIKeys();
     setUserKeys(keys);
   };
 
-  const checkModelStatus = async () => {
+  const checkModelStatus = useCallback(async () => {
     try {
       const status = await APIKeyService.checkModelConfigurationStatus();
       setModelStatus(status);
@@ -45,7 +40,12 @@ export function APIKeyManager({ onStatusChange }: APIKeyManagerProps) {
     } catch (error) {
       console.error('Failed to check model status:', error);
     }
-  };
+  }, [onStatusChange]);
+
+  useEffect(() => {
+    loadUserKeys();
+    checkModelStatus();
+  }, [checkModelStatus]);
 
   const handleKeyChange = (provider: string, value: string) => {
     const newKeys = { ...userKeys, [provider]: value };

@@ -17,3 +17,7 @@ export interface ServiceResponse<T> {
 // API Key service
 export { APIKeyService } from './api-key.service';
 export type { UserAPIKeys } from '@/lib/agent/types';
+
+// LangSmith service
+export { LangSmithService, langsmithService } from './langsmith.service';
+export type { LangSmithConfig } from './langsmith.service';

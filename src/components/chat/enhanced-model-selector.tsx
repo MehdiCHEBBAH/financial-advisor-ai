@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { ChevronDown, Check, AlertCircle, Key } from 'lucide-react';
 import { ModelConfig, ModelConfigurationStatus } from '@/lib/agent/types';
@@ -22,11 +22,6 @@ export function EnhancedModelSelector({
     useState<ModelConfigurationStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    loadModels();
-    checkModelStatus();
-  }, []);
-
   const loadModels = async () => {
     try {
       const response = await fetch('/api/models');
@@ -37,7 +32,7 @@ export function EnhancedModelSelector({
     }
   };
 
-  const checkModelStatus = async () => {
+  const checkModelStatus = useCallback(async () => {
     try {
       const response = await fetch('/api/models/status');
       const status = await response.json();
@@ -48,7 +43,12 @@ export function EnhancedModelSelector({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [onStatusChange]);
+
+  useEffect(() => {
+    loadModels();
+    checkModelStatus();
+  }, [checkModelStatus]);
 
   const getModelStatus = (modelId: string) => {
     return modelStatus?.models.find((m) => m.id === modelId);

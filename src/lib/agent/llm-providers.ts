@@ -1,6 +1,7 @@
 import { ModelConfig, AgentResponse, ToolCall } from './types';
 import { APIKeyService } from '@/lib/services';
 import { allTools } from '@/lib/tools';
+import { LangSmithTracer } from './langsmith-tracer';
 
 // LangChain imports
 import { ChatOpenAI } from '@langchain/openai';
@@ -31,142 +32,156 @@ export class LLMProvider {
 
   static async generateTextWithTools(
     modelConfig: ModelConfig,
-    messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>
+    messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
+    temperature?: number,
+    maxTokens?: number
   ): Promise<AgentResponse> {
-    try {
-      const config = this.getProviderConfig(modelConfig);
+    return LangSmithTracer.traceLLMCall(
+      modelConfig,
+      messages,
+      async () => {
+        try {
+          const config = this.getProviderConfig(modelConfig);
 
-      // Convert messages to LangChain format
-      const langchainMessages = messages.map(msg => {
-        if (msg.role === 'system') {
-          return new SystemMessage(msg.content);
-        } else if (msg.role === 'user') {
-          return new HumanMessage(msg.content);
-        } else {
-          return new HumanMessage(msg.content); // assistant messages as human for simplicity
-        }
-      });
-
-      // Get the appropriate LangChain model with tools
-      const model = this.getLangChainModelWithTools(modelConfig.provider, config.model, config.apiKey);
-
-      // Step 1: Get initial response with thinking and tool calls
-      const initialResult = await model.invoke(langchainMessages);
-      
-      // Parse the initial response to extract thinking and tool calls
-      const { thinking, mainContent: initialMainContent } = this.parseResponse(initialResult.content as string);
-      
-      // Extract tool calls from the initial result
-      const initialToolCalls = this.extractToolCalls(initialResult);
-      
-      // Step 2: Execute tools if any were called
-      const toolResults: Array<{name: string, args: Record<string, unknown>, result: unknown, success: boolean}> = [];
-      
-      if (initialResult.tool_calls && initialResult.tool_calls.length > 0) {
-        console.log('🔧 [LLM DEBUG] Executing tools in non-streaming mode:', initialResult.tool_calls.length);
-        
-        // Execute all tool calls
-        for (const toolCall of initialResult.tool_calls) {
-          try {
-            // Find the tool by name
-            const tool = allTools.find(t => t.name === toolCall.name);
-            if (tool) {
-              console.log('🔧 [LLM DEBUG] Executing tool:', toolCall.name, 'with args:', toolCall.args);
-              
-              // Execute the tool
-              const toolResult = await tool.invoke(toolCall.args);
-              
-              toolResults.push({
-                name: toolCall.name,
-                args: toolCall.args,
-                result: toolResult,
-                success: true
-              });
-              
-              console.log('🔧 [LLM DEBUG] Tool execution successful:', toolCall.name);
+          // Convert messages to LangChain format
+          const langchainMessages = messages.map(msg => {
+            if (msg.role === 'system') {
+              return new SystemMessage(msg.content);
+            } else if (msg.role === 'user') {
+              return new HumanMessage(msg.content);
             } else {
-              console.error('🔧 [LLM DEBUG] Tool not found:', toolCall.name);
-              toolResults.push({
-                name: toolCall.name,
-                args: toolCall.args,
-                result: `Tool ${toolCall.name} not found`,
-                success: false
-              });
+              return new HumanMessage(msg.content); // assistant messages as human for simplicity
             }
-          } catch (toolError) {
-            console.error(`🔧 [LLM DEBUG] Tool ${toolCall.name} execution error:`, toolError);
-            
-            toolResults.push({
-              name: toolCall.name,
-              args: toolCall.args,
-              result: toolError instanceof Error ? toolError.message : 'Unknown error',
-              success: false
-            });
-          }
-        }
-        
-        // Step 3: Create proper tool messages for each tool call
-        const toolMessages = initialResult.tool_calls.map(toolCall => {
-          const result = toolResults.find(r => r.name === toolCall.name);
-          return new ToolMessage({
-            content: JSON.stringify(result?.result || { error: 'Tool execution failed' }),
-            tool_call_id: toolCall.id || `call_${Date.now()}_${Math.random()}`,
           });
-        });
 
-        // Step 4: Create conversation with proper tool message format
-        const messagesWithToolResults = [
-          ...langchainMessages,
-          initialResult, // Include the assistant's message with tool calls
-          ...toolMessages, // Add proper tool messages
-          new HumanMessage(`Based on the tool results above, please provide a comprehensive response to the user's question. Analyze the tool results and give a helpful, informative answer.`)
-        ];
-        
-        console.log('🔧 [LLM DEBUG] Getting final response with tool results...');
-        console.log('🔧 [LLM DEBUG] Messages count:', messagesWithToolResults.length);
-        console.log('🔧 [LLM DEBUG] Tool results count:', toolResults.length);
-        
-        const finalResult = await model.invoke(messagesWithToolResults);
-        
-        console.log('🔧 [LLM DEBUG] Final result received:', !!finalResult);
-        console.log('🔧 [LLM DEBUG] Final result content length:', (finalResult.content as string)?.length || 0);
-        console.log('🔧 [LLM DEBUG] Final result content preview:', (finalResult.content as string)?.substring(0, 200) + '...');
-        
-        // Parse the final response
-        const { thinking: finalThinking, mainContent: finalMainContent } = this.parseResponse(finalResult.content as string);
-        
-        // Combine thinking from both responses
-        const combinedThinking = [thinking, finalThinking].filter(Boolean).join('\n\n');
-        
-        // Update tool calls with results
-        const updatedToolCalls = initialToolCalls.map(toolCall => {
-          const result = toolResults.find(r => r.name === toolCall.name);
-          return {
-            ...toolCall,
-            result: result?.result,
-            success: result?.success
-          };
-        });
-        
-        return {
-          content: finalMainContent || finalResult.content as string,
-          model: modelConfig.id,
-          thinking: combinedThinking || undefined,
-          toolCalls: updatedToolCalls.length > 0 ? updatedToolCalls : undefined,
-        };
-      } else {
-        // No tools called, return initial response
-        return {
-          content: initialMainContent || initialResult.content as string,
-          model: modelConfig.id,
-          thinking: thinking || undefined,
-          toolCalls: initialToolCalls.length > 0 ? initialToolCalls : undefined,
-        };
-      }
-    } catch (error) {
-      console.error('LLM Provider error:', error);
-      throw error;
-    }
+          // Get the appropriate LangChain model with tools
+          const model = this.getLangChainModelWithTools(modelConfig.provider, config.model, config.apiKey);
+
+          // Step 1: Get initial response with thinking and tool calls
+          const initialResult = await model.invoke(langchainMessages);
+          
+          // Parse the initial response to extract thinking and tool calls
+          const { thinking, mainContent: initialMainContent } = this.parseResponse(initialResult.content as string);
+          
+          // Extract tool calls from the initial result
+          const initialToolCalls = this.extractToolCalls(initialResult);
+          
+          // Step 2: Execute tools if any were called
+          const toolResults: Array<{name: string, args: Record<string, unknown>, result: unknown, success: boolean}> = [];
+          
+          if (initialResult.tool_calls && initialResult.tool_calls.length > 0) {
+            console.log('🔧 [LLM DEBUG] Executing tools in non-streaming mode:', initialResult.tool_calls.length);
+            
+            // Execute all tool calls with tracing
+            for (const toolCall of initialResult.tool_calls) {
+              try {
+                // Find the tool by name
+                const tool = allTools.find(t => t.name === toolCall.name);
+                if (tool) {
+                  console.log('🔧 [LLM DEBUG] Executing tool:', toolCall.name, 'with args:', toolCall.args);
+                  
+                  // Execute the tool with tracing
+                  const toolResult = await LangSmithTracer.traceToolCall(
+                    toolCall.name,
+                    toolCall.args,
+                    () => tool.invoke(toolCall.args)
+                  );
+                  
+                  toolResults.push({
+                    name: toolCall.name,
+                    args: toolCall.args,
+                    result: toolResult,
+                    success: true
+                  });
+                  
+                  console.log('🔧 [LLM DEBUG] Tool execution successful:', toolCall.name);
+                } else {
+                  console.error('🔧 [LLM DEBUG] Tool not found:', toolCall.name);
+                  toolResults.push({
+                    name: toolCall.name,
+                    args: toolCall.args,
+                    result: `Tool ${toolCall.name} not found`,
+                    success: false
+                  });
+                }
+              } catch (toolError) {
+                console.error(`🔧 [LLM DEBUG] Tool ${toolCall.name} execution error:`, toolError);
+                
+                toolResults.push({
+                  name: toolCall.name,
+                  args: toolCall.args,
+                  result: toolError instanceof Error ? toolError.message : 'Unknown error',
+                  success: false
+                });
+              }
+            }
+            
+            // Step 3: Create proper tool messages for each tool call
+            const toolMessages = initialResult.tool_calls.map(toolCall => {
+              const result = toolResults.find(r => r.name === toolCall.name);
+              return new ToolMessage({
+                content: JSON.stringify(result?.result || { error: 'Tool execution failed' }),
+                tool_call_id: toolCall.id || `call_${Date.now()}_${Math.random()}`,
+              });
+            });
+
+            // Step 4: Create conversation with proper tool message format
+            const messagesWithToolResults = [
+              ...langchainMessages,
+              initialResult, // Include the assistant's message with tool calls
+              ...toolMessages, // Add proper tool messages
+              new HumanMessage(`Based on the tool results above, please provide a comprehensive response to the user's question. Analyze the tool results and give a helpful, informative answer.`)
+            ];
+            
+            console.log('🔧 [LLM DEBUG] Getting final response with tool results...');
+            console.log('🔧 [LLM DEBUG] Messages count:', messagesWithToolResults.length);
+            console.log('🔧 [LLM DEBUG] Tool results count:', toolResults.length);
+            
+            const finalResult = await model.invoke(messagesWithToolResults);
+            
+            console.log('🔧 [LLM DEBUG] Final result received:', !!finalResult);
+            console.log('🔧 [LLM DEBUG] Final result content length:', (finalResult.content as string)?.length || 0);
+            console.log('🔧 [LLM DEBUG] Final result content preview:', (finalResult.content as string)?.substring(0, 200) + '...');
+            
+            // Parse the final response
+            const { thinking: finalThinking, mainContent: finalMainContent } = this.parseResponse(finalResult.content as string);
+            
+            // Combine thinking from both responses
+            const combinedThinking = [thinking, finalThinking].filter(Boolean).join('\n\n');
+            
+            // Update tool calls with results
+            const updatedToolCalls = initialToolCalls.map(toolCall => {
+              const result = toolResults.find(r => r.name === toolCall.name);
+              return {
+                ...toolCall,
+                result: result?.result,
+                success: result?.success
+              };
+            });
+            
+            return {
+              content: finalMainContent || finalResult.content as string,
+              model: modelConfig.id,
+              thinking: combinedThinking || undefined,
+              toolCalls: updatedToolCalls.length > 0 ? updatedToolCalls : undefined,
+            };
+          } else {
+            // No tools called, return initial response
+            return {
+              content: initialMainContent || initialResult.content as string,
+              model: modelConfig.id,
+              thinking: thinking || undefined,
+              toolCalls: initialToolCalls.length > 0 ? initialToolCalls : undefined,
+            };
+          }
+        } catch (error) {
+          console.error('LLM Provider error:', error);
+          throw error;
+        }
+      },
+      temperature,
+      maxTokens
+    );
   }
 
   static async *streamTextWithTools(

@@ -96,7 +96,12 @@ Error Handling:
     }));
 
     // Generate response with tools
-    const response = await LLMProvider.generateTextWithTools(modelConfig, modelMessages);
+    const response = await LLMProvider.generateTextWithTools(
+      modelConfig, 
+      modelMessages, 
+      request.temperature, 
+      request.maxOutputTokens
+    );
 
     return response;
   }

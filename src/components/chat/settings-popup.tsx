@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import Image from 'next/image';
 import { X, Settings, Key, Check, AlertCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -52,7 +53,7 @@ export function SettingsPopup({
   const currentProvider = currentModel?.provider || '';
 
   // Check provider configuration status
-  const checkProviderConfiguration = async () => {
+  const checkProviderConfiguration = useCallback(async () => {
     setIsCheckingStatus(true);
     try {
       const response = await fetch('/api/models/status');
@@ -85,7 +86,7 @@ export function SettingsPopup({
     } finally {
       setIsCheckingStatus(false);
     }
-  };
+  }, [providers]);
 
   // Initialize selected provider when popup opens
   useEffect(() => {
@@ -99,7 +100,7 @@ export function SettingsPopup({
     if (isOpen) {
       checkProviderConfiguration();
     }
-  }, [isOpen]); // Only run when popup opens/closes, not when provider changes
+  }, [isOpen, checkProviderConfiguration]); // Only run when popup opens/closes, not when provider changes
 
   // Load API keys when provider changes (always show API key fields)
   useEffect(() => {
@@ -317,9 +318,11 @@ export function SettingsPopup({
                     }`}
                   >
                     <div className="flex items-center gap-3">
-                      <img
+                      <Image
                         src={provider.icon}
                         alt={`${provider.name} logo`}
+                        width={32}
+                        height={32}
                         className="w-8 h-8 object-contain"
                         onError={(e) => {
                           // Fallback to a generic icon if image fails to load

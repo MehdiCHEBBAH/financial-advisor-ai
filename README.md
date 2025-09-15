@@ -4,18 +4,20 @@ An AI powered Financial Adviser who will advise you to invest or not in the stoc
 
 ## 🚀 Features
 
-- **Next.js 15 Boilerplate**: Clean, minimal starting structure
+- **AI Financial Adviser**: Intelligent financial advice using multiple LLM providers
+- **Real-time Financial Data**: Live news, stock data, and market information
+- **Multi-Provider Support**: OpenAI, Groq, Google, and DeepSeek integration
+- **LangSmith Integration**: Comprehensive tracing and evaluation framework
+- **Tool-based Architecture**: Modular financial data tools and services
 - **TypeScript**: Full TypeScript support with strict configuration
-- **Tailwind CSS**: Utility-first CSS framework
-- **Testing Setup**: Jest and React Testing Library configured
-- **Code Quality**: ESLint, Prettier, and Husky pre-commit hooks
-- **API Routes**: Basic health check and status endpoints
-- **Responsive Design**: Modern UI foundation ready for customization
+- **Modern UI**: Clean, responsive interface with Tailwind CSS
+- **Testing & Quality**: Jest, ESLint, Prettier, and comprehensive test coverage
 
 ## 🛠️ Tech Stack
 
 - **Framework**: Next.js 15 with App Router
 - **Language**: TypeScript
+- **AI/ML**: LangChain, LangSmith, Multiple LLM Providers
 - **Styling**: Tailwind CSS v4
 - **Testing**: Jest + React Testing Library
 - **Code Quality**: ESLint + Prettier + Husky
@@ -50,12 +52,26 @@ cp .env.example .env.local
 Edit `.env.local` with your configuration:
 
 ```env
-# Application Configuration
-NODE_ENV=development
+# LLM Provider API Keys (choose the providers you want to use)
+GROQ_API_KEY=your_groq_api_key_here
+OPENAI_API_KEY=your_openai_api_key_here
+GOOGLE_GENERATIVE_AI_API_KEY=your_google_api_key_here
+DEEPSEEK_API_KEY=your_deepseek_api_key_here
 
-# Add your API keys here
-# OPENAI_API_KEY=your_openai_api_key
-# ALPHA_VANTAGE_API_KEY=your_alpha_vantage_api_key
+# Financial Data API Keys
+MEDIASTACK_API_KEY=your_mediastack_api_key_here
+MARKETSTACK_API_KEY=your_marketstack_api_key_here
+
+# LangSmith Configuration (for tracing and evaluation)
+LANGSMITH_API_KEY=your_langsmith_api_key_here
+LANGSMITH_PROJECT=financial-adviser-ai
+LANGSMITH_ENVIRONMENT=development
+LANGSMITH_TRACING=true
+```
+
+**Quick Setup**: Run the setup script for guided configuration:
+```bash
+./setup-env.sh
 ```
 
 ### 4. Run the development server
@@ -66,6 +82,39 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) in your browser to see the application.
 
+## 🔍 LangSmith Integration
+
+This project includes comprehensive LangSmith integration for tracing and evaluation:
+
+### Tracing
+- **Automatic LLM Tracing**: All model calls are automatically traced
+- **Tool Usage Tracking**: Financial data tools are monitored
+- **Error Tracking**: Failed calls and errors are logged
+- **Performance Metrics**: Response times and token usage
+
+### Evaluation Framework
+- **Multiple Datasets**: Basic questions, advanced analysis, tool usage tests
+- **Automated Scoring**: Relevance, accuracy, tool usage, completeness
+- **Batch Evaluation**: Run evaluations on multiple examples
+- **Feedback Collection**: Human and automated feedback
+
+### Running Evaluations
+
+```bash
+# List available evaluation datasets
+pnpm tsx scripts/run-evaluation.ts --list-datasets
+
+# Run evaluation on basic questions
+pnpm tsx scripts/run-evaluation.ts --dataset basic --create-dataset --run-evaluation
+
+# Run evaluation via API
+curl -X POST http://localhost:3000/api/evaluation \
+  -H "Content-Type: application/json" \
+  -d '{"dataset": "basic", "runEvaluation": true}'
+```
+
+For detailed LangSmith integration guide, see [docs/langsmith-integration.md](./docs/langsmith-integration.md).
+
 ## 📁 Project Structure
 
 ```
@@ -73,27 +122,28 @@ financial-adviser-ai/
 ├── src/
 │   ├── app/                    # Next.js App Router
 │   │   ├── api/               # API routes
+│   │   │   ├── chat/          # Chat API endpoint
+│   │   │   ├── evaluation/    # Evaluation API endpoint
 │   │   │   ├── health/        # Health check endpoint
-│   │   │   ├── status/        # Service status endpoint
-│   │   │   ├── hello/         # Hello world endpoint
-│   │   │   └── analyze-stock/ # Stock analysis endpoint
+│   │   │   ├── models/        # Model status endpoints
+│   │   │   └── status/        # Service status endpoint
 │   │   ├── globals.css        # Global styles
 │   │   ├── layout.tsx         # Root layout
 │   │   └── page.tsx           # Home page
 │   ├── components/            # React components
-│   │   ├── FinancialAdviserForm.tsx
-│   │   ├── LoadingSpinner.tsx
-│   │   └── StockAnalysisResult.tsx
+│   │   ├── chat/              # Chat UI components
+│   │   └── ui/                # Reusable UI components
 │   └── lib/
-│       └── services/          # Service layer
-│           ├── index.ts
-│           ├── base.service.ts
-│           ├── financial-adviser.service.ts
-│           ├── stock-analysis.service.ts
-│           └── cache.service.ts
+│       ├── agent/             # AI agent implementation
+│       ├── evaluation/        # LangSmith evaluation framework
+│       ├── services/          # Service layer
+│       └── tools/             # Financial data tools
+├── scripts/                   # Utility scripts
+│   └── run-evaluation.ts      # Evaluation runner
+├── docs/                      # Documentation
+│   └── langsmith-integration.md
 ├── __tests__/                 # Test files
 ├── __mocks__/                 # Mock files
-├── .husky/                    # Git hooks
 └── Configuration files
 ```
 
@@ -146,21 +196,26 @@ npm run start
 
 ## 📊 API Endpoints
 
-### Health Check
-- **GET** `/api/health` - Returns service health status
+### Chat API
+- **POST** `/api/chat` - Main chat endpoint for financial advice
+  - Accepts OpenAI-compatible format
+  - Supports multiple LLM providers
+  - Includes tool usage and tracing
 
-### Service Status
-- **GET** `/api/status` - Returns detailed service status
+### Evaluation API
+- **GET** `/api/evaluation?dataset=<name>` - Get evaluation dataset info
+- **POST** `/api/evaluation` - Run evaluations and create datasets
+  - Supports multiple evaluation datasets
+  - Batch evaluation processing
+  - LangSmith integration
 
-### Hello World
-- **GET** `/api/hello?name=World` - Simple hello endpoint
-- **POST** `/api/hello` - Hello with JSON body
+### Model Management
+- **GET** `/api/models` - List available models
+- **GET** `/api/models/status` - Model status and health
 
-### Basic Endpoints
-The boilerplate includes basic API endpoints for health monitoring and testing:
+### Health & Status
 - **GET** `/api/health` - Service health check
-- **GET** `/api/status` - Detailed service status  
-- **GET** `/api/hello` - Simple hello world endpoint
+- **GET** `/api/status` - Detailed service status
 
 ## 🏗️ Architecture
 
