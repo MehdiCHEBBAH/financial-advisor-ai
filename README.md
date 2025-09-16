@@ -1,27 +1,35 @@
 # Financial Adviser AI
 
-An AI powered Financial Adviser who will advise you to invest or not in the stocks of a specific stock of your choice.
+An AI-powered financial adviser that provides responsible, data-informed guidance on stocks and markets. It integrates multiple LLM providers, live market/news tools, and a built-in evaluation framework to measure quality.
 
 ## 🚀 Features
 
-- **AI Financial Adviser**: Intelligent financial advice using multiple LLM providers
-- **Real-time Financial Data**: Live news, stock data, and market information
-- **Multi-Provider Support**: OpenAI, Groq, Google, and DeepSeek integration
-- **LangSmith Integration**: Comprehensive tracing and evaluation framework
-- **Tool-based Architecture**: Modular financial data tools and services
-- **TypeScript**: Full TypeScript support with strict configuration
-- **Modern UI**: Clean, responsive interface with Tailwind CSS
-- **Testing & Quality**: Jest, ESLint, Prettier, and comprehensive test coverage
+- **Core Advice Engine**: Multi-step agent that balances general guidance with live data lookups
+- **Real-time Market Intelligence**: Tools for live news, stock quotes, symbol search, and historical context
+- **Multi-LLM Provider Support**: OpenAI, Groq, Google Generative AI, and DeepSeek with pluggable adapters
+- **Evaluation Built-in**: LangSmith-backed datasets, batch runs, scoring, and feedback generation
+- **Observability & Tracing**: End-to-end trace of model calls, tools, timings, and errors
+- **Strong UX**: Clean, responsive UI using Tailwind with an accessible chat experience
+- **Type-safe Codebase**: End-to-end TypeScript with strict configs and clear domain types
+- **Quality Tooling**: Jest + RTL tests, ESLint, Prettier; ready for CI and Vercel deployment
+
+> Looking for the evaluation deep dive? See the dedicated guide: `docs/evaluation.md`.
 
 ## 🛠️ Tech Stack
 
-- **Framework**: Next.js 15 with App Router
-- **Language**: TypeScript
-- **AI/ML**: LangChain, LangSmith, Multiple LLM Providers
-- **Styling**: Tailwind CSS v4
-- **Testing**: Jest + React Testing Library
-- **Code Quality**: ESLint + Prettier + Husky
-- **Deployment**: Vercel-ready configuration
+- **Framework**: Next.js 15 (App Router) — server-centric, file-based routing, and first-class edge/serverless support
+- **Language**: TypeScript — strict typing for safer financial logic and tool contracts
+- **AI/ML**: Custom agent orchestration with LangSmith tracing; multiple LLM providers via lightweight adapters
+- **Styling**: Tailwind CSS v4 — fast iteration, consistent design tokens
+- **Testing**: Jest + React Testing Library — deterministic unit and UI tests
+- **Code Quality**: ESLint + Prettier — consistent style and rules across server/client
+- **Deployment**: Vercel — zero-config serverless APIs with environment separation
+
+### Why these choices
+- **Next.js App Router**: Enables colocated server actions and API routes for tools, low-latency model calls, and easy SSR/edge deployment.
+- **Provider Abstraction**: Markets and model offerings evolve quickly. A pluggable LLM layer avoids lock-in and supports A/B testing.
+- **LangSmith**: Provides production-grade tracing/evaluation so we can measure model behavior and iterate safely.
+- **TypeScript**: Financial advice requires careful handling of inputs/outputs. Types reduce regressions and improve tooling contracts.
 
 ## 📋 Prerequisites
 
@@ -87,16 +95,18 @@ Open [http://localhost:3000](http://localhost:3000) in your browser to see the a
 This project includes comprehensive LangSmith integration for tracing and evaluation:
 
 ### Tracing
-- **Automatic LLM Tracing**: All model calls are automatically traced
-- **Tool Usage Tracking**: Financial data tools are monitored
-- **Error Tracking**: Failed calls and errors are logged
-- **Performance Metrics**: Response times and token usage
+- **Automatic LLM Tracing**: All model and tool calls are traced with timings and inputs/outputs
+- **Tool Usage Tracking**: Capture arguments, success flags, and downstream effects
+- **Error Tracking**: Centralized visibility into failures with reproducible runs
+- **Performance Metrics**: Latency and token usage to guide cost/perf trade-offs
 
-### Evaluation Framework
-- **Multiple Datasets**: Basic questions, advanced analysis, tool usage tests
-- **Automated Scoring**: Relevance, accuracy, tool usage, completeness
-- **Batch Evaluation**: Run evaluations on multiple examples
-- **Feedback Collection**: Human and automated feedback
+### Evaluation Framework (high level)
+- **Datasets**: Curated suites: basic, advanced, tool-usage, edge-cases, and an all-in-one set
+- **Scoring**: Heuristic metrics: relevance, accuracy, tool-usage appropriateness, completeness, and an overall composite
+- **Batch Runs**: CLI and API to run evaluations locally or in CI and upload to LangSmith
+- **Feedback**: Auto-generated strengths/weaknesses/suggestions per example; exported with scores
+
+For detailed evaluation methodology, metrics, and roadmap, see `docs/evaluation.md`.
 
 ### Running Evaluations
 
@@ -113,7 +123,7 @@ curl -X POST http://localhost:3000/api/evaluation \
   -d '{"dataset": "basic", "runEvaluation": true}'
 ```
 
-For detailed LangSmith integration guide, see [docs/langsmith-integration.md](./docs/langsmith-integration.md).
+For detailed LangSmith integration guide, see [LangSmith integration](./docs/langsmith-integration.md). For the evaluation deep dive, see [Evaluation guide](./docs/evaluation.md).
 
 ## 📁 Project Structure
 
@@ -219,33 +229,29 @@ npm run start
 
 ## 🏗️ Architecture
 
-### Minimal Structure
-The boilerplate provides a clean foundation with:
-- **Next.js App Router**: Modern file-based routing
-- **TypeScript**: Strict type checking and path aliases
-- **Service Layer**: Ready for business logic implementation
-- **Component Structure**: Organized React components
+### High-level design
+- **Agent-first**: `src/lib/agent` implements a `FinancialAgent` that can reason, call tools, and produce advisory responses.
+- **Tools as Services**: Financial data access is encapsulated in `src/lib/services` and exposed as tools in `src/lib/tools` for the agent.
+- **API surface**: App Router routes under `src/app/api` for chat, models, evaluation, status, and health.
+- **Evaluation loop**: `src/lib/evaluation` plus `scripts/run-evaluation.ts` and `/api/evaluation` to run and analyze.
 
-### Error Handling
-Basic error handling setup:
-- API route error responses
-- HTTP status codes
-- TypeScript error types
+### Error handling
+- Consistent error responses in API routes with proper HTTP codes
+- Defensive checks (e.g., model validation, provider availability)
+- Safe fallbacks if tools or providers are unavailable
 
 ## 🔐 Security
 
 - Input validation and sanitization
-- Rate limiting (to be implemented)
 - Environment variable protection
-- Secure API endpoints
+- Secure API endpoints and server-only keys
+- Rate limiting (roadmap)
 
 ## 📈 Performance
 
-- Serverless API routes
-- Intelligent caching
-- Optimized bundle with Turbopack
-- Image optimization
-- Code splitting
+- Serverless API routes and edge-friendly design
+- Intelligent caching opportunities for non-sensitive market data
+- Optimized bundle with Turbopack, code splitting, and deferred hydration
 
 ## 🚀 Deployment
 
@@ -280,3 +286,20 @@ If you have any questions or need help, please:
 ---
 
 Built with ❤️ using Next.js 15
+
+---
+
+## 📐 Evaluation Summary (quick reference)
+
+Metrics computed per response (0–1):
+- **Relevance**: Does the answer target the user’s question?
+- **Accuracy**: Responsible financial framing (disclaimers, risk, no guarantees)
+- **Tool Usage**: Appropriate use of live-data tools when expected
+- **Completeness**: Depth, structure, and sufficient coverage
+- **Overall**: Average of the above, used for quick comparisons
+
+Roadmap highlights:
+- Expand metrics with model-graded rubrics and semantic similarity checks
+- Add hallucination checks via retrieval-grounded testing
+- Scenario coverage growth (macro events, volatility regimes, earnings seasons)
+- CI gating on evaluation regressions
