@@ -176,7 +176,7 @@ async function createAgentNonStreamingResponse(
     const sessionId = `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     
     // Trace the agent run
-    const response = await LangSmithTracer.traceAgentRun(
+    const traced = await LangSmithTracer.traceAgentRun(
       sessionId,
       userMessage,
       () => agent.processMessage({
@@ -186,6 +186,11 @@ async function createAgentNonStreamingResponse(
         maxOutputTokens: maxTokens,
       })
     );
+    const response = traced.result;
+    const runId = traced.runId;
+    // Debug: log runId we are returning
+    // eslint-disable-next-line no-console
+    console.log('🧪 /api/chat returning runId:', runId);
 
     // Convert back to OpenAI format for backward compatibility
     const openAIResponse = {
@@ -201,6 +206,7 @@ async function createAgentNonStreamingResponse(
             content: response.content,
             thinking: response.thinking,
             toolCalls: response.toolCalls,
+            runId,
           },
           finish_reason: 'stop',
         },

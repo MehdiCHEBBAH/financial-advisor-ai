@@ -22,6 +22,7 @@ interface Message {
   errorProvider?: string;
   thinking?: string;
   toolCalls?: ToolCall[];
+  runId?: string | null;
 }
 
 interface ToolCall {
@@ -449,6 +450,7 @@ export function ChatUIV5() {
         // Get thinking and tool calls directly from the response if available
         const thinking = message.thinking;
         const toolCalls = message.toolCalls || [];
+        const runId = message.runId as string | null | undefined;
         
         // If thinking and tool calls are not in the response, try to parse from content
         let parsedThinking = thinking;
@@ -472,6 +474,7 @@ export function ChatUIV5() {
                 mainContent: mainContent,
                 thinking: parsedThinking,
                 toolCalls: parsedToolCalls,
+                runId: runId ?? null,
               };
             }
             return msg;
@@ -715,6 +718,7 @@ export function ChatUIV5() {
                 thinking={message.thinking}
                 toolCalls={message.toolCalls}
                 isLoading={isLoading && !message.isUser && message.id === messages[messages.length - 1]?.id}
+                runId={message.runId}
               />
             ))}
             <div ref={messagesEndRef} />

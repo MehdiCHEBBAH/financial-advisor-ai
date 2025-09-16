@@ -54,7 +54,7 @@ export class LangSmithTracer {
       'llm'
     );
 
-    return run ? (run as LangSmithRun).id : null;
+    return run;
   }
 
   private static async updateLLMRun(
@@ -127,7 +127,7 @@ export class LangSmithTracer {
       return toolCall();
     }
 
-    const run = await langsmithService.createRun(
+    const runId = await langsmithService.createRun(
       `tool-call-${toolName}`,
       {
         toolName,
@@ -140,8 +140,8 @@ export class LangSmithTracer {
     try {
       const result = await toolCall();
       
-      if (run) {
-        await langsmithService.updateRun(run ? (run as LangSmithRun).id : '', {
+      if (runId) {
+        await langsmithService.updateRun(runId, {
           outputs: { result },
           endTime: new Date(),
         });
@@ -149,8 +149,8 @@ export class LangSmithTracer {
 
       return result;
     } catch (error) {
-      if (run) {
-        await langsmithService.updateRun(run ? (run as LangSmithRun).id : '', {
+      if (runId) {
+        await langsmithService.updateRun(runId, {
           error: error instanceof Error ? error.message : 'Unknown error',
           endTime: new Date(),
         });
@@ -163,12 +163,13 @@ export class LangSmithTracer {
     sessionId: string,
     userMessage: string,
     agentCall: () => Promise<AgentResponse>
-  ): Promise<AgentResponse> {
+  ): Promise<{ result: AgentResponse; runId: string | null }> {
     if (!langsmithService.isEnabled()) {
-      return agentCall();
+      const result = await agentCall();
+      return { result, runId: null };
     }
 
-    const run = await langsmithService.createRun(
+    const runId = await langsmithService.createRun(
       `agent-run-${sessionId}`,
       {
         sessionId,
@@ -177,12 +178,16 @@ export class LangSmithTracer {
       },
       'chain'
     );
+    // Debug log
+    console.log('🧪 traceAgentRun created run:', runId);
 
     try {
       const result = await agentCall();
       
-      if (run) {
-        await langsmithService.updateRun(run ? (run as LangSmithRun).id : '', {
+      if (runId) {
+        const id = runId;
+        console.log('🧪 traceAgentRun updating run:', id);
+        await langsmithService.updateRun(id, {
           outputs: {
             content: result.content,
             thinking: result.thinking,
@@ -193,10 +198,12 @@ export class LangSmithTracer {
         });
       }
 
-      return result;
+      return { result, runId: runId ?? null };
     } catch (error) {
-      if (run) {
-        await langsmithService.updateRun(run ? (run as LangSmithRun).id : '', {
+      if (runId) {
+        const id = runId;
+        console.log('🧪 traceAgentRun error, updating run:', id);
+        await langsmithService.updateRun(id, {
           error: error instanceof Error ? error.message : 'Unknown error',
           endTime: new Date(),
         });

@@ -2,7 +2,7 @@
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
-import { AlertCircle, RefreshCw, ChevronDown, ChevronRight, Wrench } from 'lucide-react';
+import { AlertCircle, RefreshCw, ChevronDown, ChevronRight, Wrench, ThumbsUp, ThumbsDown, Copy } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
@@ -36,6 +36,7 @@ interface ChatMessageProps {
   readonly thinking?: string;
   readonly toolCalls?: ToolCall[];
   readonly isLoading?: boolean;
+  readonly runId?: string | null;
 }
 
 export function ChatMessage({
@@ -49,9 +50,13 @@ export function ChatMessage({
   thinking,
   toolCalls = [],
   isLoading = false,
+  runId,
 }: ChatMessageProps) {
   const [isThinkingExpanded, setIsThinkingExpanded] = useState(false);
   const [isToolCallsExpanded, setIsToolCallsExpanded] = useState(false);
+  const [reaction, setReaction] = useState<'like' | 'dislike' | null>(null);
+  const [isSendingFeedback, setIsSendingFeedback] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   // Clean message content to prevent unwanted Markdown list conversion
   const cleanMessage = (content: string): string => {
@@ -331,6 +336,88 @@ export function ChatMessage({
             </button>
           )}
         </div>
+        {/* Actions under the bubble for assistant messages */}
+        {!isUser && !isError && (
+          <div className="mt-2 flex items-center gap-2 text-xs text-gray-500">
+            <button
+              aria-label="Copy answer"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(message || '');
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 1200);
+                } catch {}
+              }}
+              className="px-2 py-1 rounded hover:bg-gray-100 border border-transparent flex items-center gap-1"
+              title="Copy answer"
+            >
+              <Copy className="h-3.5 w-3.5" />
+              <span>{copied ? 'Copied' : 'Copy'}</span>
+            </button>
+            <button
+              aria-label="Like answer"
+              disabled={isSendingFeedback}
+              onClick={async () => {
+                if (!runId) return;
+                try {
+                  setIsSendingFeedback(true);
+                  const prev = reaction;
+                  setReaction('like');
+                  const res = await fetch('/api/feedback', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ runId, reaction: 'like' }),
+                  });
+                  if (!res.ok) {
+                    console.error('Failed to send like feedback');
+                    setReaction(prev);
+                  }
+                } finally {
+                  setIsSendingFeedback(false);
+                }
+              }}
+              className={cn(
+                'px-2 py-1 rounded hover:bg-green-50 border flex items-center gap-1',
+                reaction === 'like' ? 'text-green-700 border-green-200 bg-green-50' : 'text-gray-500 border-transparent'
+              )}
+              title={'I like this answer'}
+            >
+              <ThumbsUp className="h-3.5 w-3.5" />
+              <span>Like</span>
+            </button>
+            <button
+              aria-label="Dislike answer"
+              disabled={isSendingFeedback}
+              onClick={async () => {
+                if (!runId) return;
+                try {
+                  setIsSendingFeedback(true);
+                  const prev = reaction;
+                  setReaction('dislike');
+                  const res = await fetch('/api/feedback', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ runId, reaction: 'dislike' }),
+                  });
+                  if (!res.ok) {
+                    console.error('Failed to send dislike feedback');
+                    setReaction(prev);
+                  }
+                } finally {
+                  setIsSendingFeedback(false);
+                }
+              }}
+              className={cn(
+                'px-2 py-1 rounded hover:bg-red-50 border flex items-center gap-1',
+                reaction === 'dislike' ? 'text-red-700 border-red-200 bg-red-50' : 'text-gray-500 border-transparent'
+              )}
+              title={"I don't like this answer"}
+            >
+              <ThumbsDown className="h-3.5 w-3.5" />
+              <span>Dislike</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {isUser && (

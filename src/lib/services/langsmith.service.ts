@@ -1,4 +1,5 @@
 import { Client } from 'langsmith';
+import { randomUUID } from 'crypto';
 
 export interface LangSmithConfig {
   apiKey?: string;
@@ -40,7 +41,10 @@ export class LangSmithService {
           apiKey: this.config.apiKey,
           apiUrl: 'https://api.smith.langchain.com',
         });
-        console.log('🔍 LangSmith client initialized successfully');
+        console.log('🔍 LangSmith client initialized successfully', {
+          project: this.getProjectName(),
+          environment: this.getEnvironment(),
+        });
       } catch (error) {
         console.error('❌ Failed to initialize LangSmith client:', error);
         this.client = null;
@@ -74,13 +78,15 @@ export class LangSmithService {
     name: string,
     inputs: Record<string, unknown>,
     runType: 'llm' | 'chain' | 'tool' | 'retriever' = 'chain'
-  ) {
+  ): Promise<string | null> {
     if (!this.isEnabled()) {
       return null;
     }
 
     try {
-      return await this.client!.createRun({
+      const runId = randomUUID();
+      await this.client!.createRun({
+        id: runId,
         name,
         run_type: runType,
         inputs,
@@ -90,6 +96,9 @@ export class LangSmithService {
           timestamp: new Date().toISOString(),
         },
       });
+      // Debug: print created run id
+      console.log('🧪 LangSmith created run with id:', runId);
+      return runId;
     } catch (error) {
       console.error('❌ Failed to create LangSmith run:', error);
       return null;
