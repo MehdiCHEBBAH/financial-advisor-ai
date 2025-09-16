@@ -39,6 +39,22 @@ export class APIKeyService {
   }
 
   /**
+   * Remove a single API key for a provider
+   */
+  static removeAPIKey(provider: string): void {
+    if (typeof window === 'undefined') return;
+    try {
+      const userKeys = this.getUserAPIKeys();
+      if (provider in userKeys) {
+        delete (userKeys as Record<string, string>)[provider];
+        this.saveUserAPIKeys(userKeys);
+      }
+    } catch (error) {
+      console.error('Failed to remove API key:', error);
+    }
+  }
+
+  /**
    * Clear all user API keys
    */
   static clearUserAPIKeys(): void {
@@ -82,7 +98,7 @@ export class APIKeyService {
       groq: 'GROQ_API_KEY',
       openai: 'OPENAI_API_KEY',
       deepseek: 'DEEPSEEK_API_KEY',
-      google: 'GOOGLE_API_KEY',
+      google: 'GOOGLE_GENERATIVE_AI_API_KEY',
     };
 
     const envVar = envVarMap[provider];
@@ -108,7 +124,7 @@ export class APIKeyService {
       groq: 'GROQ_API_KEY',
       openai: 'OPENAI_API_KEY',
       deepseek: 'DEEPSEEK_API_KEY',
-      google: 'GOOGLE_API_KEY',
+      google: 'GOOGLE_GENERATIVE_AI_API_KEY',
     };
 
     const envVar = envVarMap[provider];

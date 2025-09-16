@@ -165,6 +165,8 @@ export function EnhancedSettingsPopup({
     if (!enabled) {
       // Clear the API key when toggling off
       setApiKeys((prev) => ({ ...prev, [provider]: '' }));
+      // Immediately remove from localStorage to avoid counting as configured
+      APIKeyService.removeAPIKey(provider);
     }
   };
 
